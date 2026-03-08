@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Electron build output
+dist/
+out/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Runtime config (contains local paths – don't commit)
+picoclaw.config.json
+
+# PicoClaw binary (kept locally, not part of the web app)
+*.exe
+*.bin
+picoclaw

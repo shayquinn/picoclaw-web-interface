@@ -218,6 +218,7 @@ type ChannelsConfig struct {
 	WeComApp   WeComAppConfig   `json:"wecom_app"`
 	WeComAIBot WeComAIBotConfig `json:"wecom_aibot"`
 	Pico       PicoConfig       `json:"pico"`
+	Web        WebConfig        `json:"web"`
 }
 
 // GroupTriggerConfig controls when the bot responds in group chats.
@@ -399,6 +400,14 @@ type PicoConfig struct {
 	MaxConnections  int                 `json:"max_connections,omitempty"`
 	AllowFrom       FlexibleStringSlice `json:"allow_from"                  env:"PICOCLAW_CHANNELS_PICO_ALLOW_FROM"`
 	Placeholder     PlaceholderConfig   `json:"placeholder,omitempty"`
+}
+
+type WebConfig struct {
+	Enabled            bool                `json:"enabled"              env:"PICOCLAW_CHANNELS_WEB_ENABLED"`
+	Host               string              `json:"host"                 env:"PICOCLAW_CHANNELS_WEB_HOST"`
+	Port               int                 `json:"port"                 env:"PICOCLAW_CHANNELS_WEB_PORT"`
+	AllowFrom          FlexibleStringSlice `json:"allow_from"           env:"PICOCLAW_CHANNELS_WEB_ALLOW_FROM"`
+	ReasoningChannelID string              `json:"reasoning_channel_id" env:"PICOCLAW_CHANNELS_WEB_REASONING_CHANNEL_ID"`
 }
 
 type HeartbeatConfig struct {
