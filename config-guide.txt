@@ -1,0 +1,1272 @@
+═══════════════════════════════════════════════════════════════════════════════
+                        PICOCLAW CONFIG.JSON GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+Location: ~/.picoclaw/config.json
+Example: config.example.json in the repository
+
+ENVIRONMENT VARIABLES:
+  PICOCLAW_CONFIG=/path/to/config.json  # Override config file location
+  PICOCLAW_HOME=/path/to/data           # Override data directory (~/.picoclaw)
+  PICOCLAW_BUILTIN_SKILLS=/path/skills  # Override builtin skills location
+
+═══════════════════════════════════════════════════════════════════════════════
+1. AGENTS CONFIGURATION
+═══════════════════════════════════════════════════════════════════════════════
+
+agents.defaults:
+  workspace: "~/.picoclaw/workspace"
+    - Working directory where agent stores files, sessions, memory
+    - Default: ~/.picoclaw/workspace
+    - Can be absolute or relative path
+  
+  restrict_to_workspace: true
+    - Security sandbox: restrict file operations to workspace only
+    - true = agent can only access files within workspace (secure)
+    - false = agent can access any path (SECURITY RISK - use with caution)
+    - Default: true
+    - Protected tools: read_file, write_file, list_dir, edit_file, append_file, exec
+  
+  model_name: "gpt4"
+    - Reference to a model defined in model_list
+    - Must match a model_name from model_list section
+    - Example: "gpt4", "claude-sonnet-4.6", "deepseek"
+  
+  max_tokens: 8192
+    - Maximum tokens for model context window
+    - Controls how much context the model can process
+    - Higher = more context but slower/more expensive
+    - Typical values: 4096, 8192, 16384, 32768
+  
+  temperature: 0.7
+    - Controls randomness in responses (0.0 - 1.0)
+    - 0.0 = deterministic, focused
+    - 1.0 = creative, random
+    - Default: 0.7 (balanced)
+  
+  max_tool_iterations: 20
+    - Maximum number of tool calls per conversation turn
+    - Prevents infinite loops
+    - Default: 20
+  
+  summarize_message_threshold: 20
+    - Number of messages before triggering auto-summarization
+    - Keeps context manageable in long conversations
+    - Default: 20
+  
+  summarize_token_percent: 75
+    - Percentage of max_tokens that triggers summarization
+    - Example: at 75%, if context reaches 75% of max_tokens, summarize
+    - Prevents context overflow
+    - Default: 75
+
+═══════════════════════════════════════════════════════════════════════════════
+2. MODEL_LIST CONFIGURATION (New Model-Centric Approach)
+═══════════════════════════════════════════════════════════════════════════════
+
+The model_list configuration allows zero-code provider addition. Simply specify
+vendor/model format to add new providers.
+
+SUPPORTED VENDORS:
+  openai/          - OpenAI (GPT models)
+  anthropic/       - Anthropic (Claude models)
+  zhipu/           - 智谱 AI (GLM models)
+  deepseek/        - DeepSeek
+  gemini/          - Google Gemini
+  groq/            - Groq (fast inference)
+  moonshot/        - Moonshot AI
+  qwen/            - 通义千问 (Qwen)
+  nvidia/          - NVIDIA
+  ollama/          - Ollama (local models)
+  openrouter/      - OpenRouter (multi-model gateway)
+  litellm/         - LiteLLM Proxy
+  vllm/            - vLLM
+  cerebras/        - Cerebras
+  volcengine/      - 火山引擎
+  shengsuanyun/    - 神算云
+  antigravity/     - Antigravity (OAuth only)
+  github-copilot/  - GitHub Copilot
+
+Each model in model_list:
+  model_name: "gpt4"
+    - Friendly identifier for this model configuration
+    - Use this name in agents.defaults.model_name
+    - Can be any string you choose
+  
+  model: "openai/gpt-5.2"
+    - Vendor/model identifier (format: vendor/model)
+    - Examples: "openai/gpt-5.2", "anthropic/claude-sonnet-4.6"
+    - Vendor prefix determines which API protocol to use
+  
+  api_key: "sk-..."
+    - API key for authentication
+    - Get from provider dashboard
+    - Leave blank for OAuth providers (antigravity)
+    - Not needed for local models (ollama)
+  
+  api_base: "https://api.openai.com/v1"
+    - Custom API endpoint (optional)
+    - Leave empty to use default
+    - Use for: proxies, load balancers, self-hosted models
+    - Example for Ollama: "http://localhost:11434/v1"
+  
+  auth_method: "api_key" | "oauth"
+    - Authentication method
+    - "api_key" = use api_key field (default)
+    - "oauth" = browser-based OAuth (Google/Gemini)
+  
+  thinking_level: "high" | "medium" | "low"
+    - Extended reasoning level for o1/Claude/Gemini Thinking models
+    - "high" = deep reasoning (more tokens/cost)
+    - "medium" = balanced
+    - "low" = quick
+  
+  max_tokens_field: "max_tokens" | "max_completion_tokens"
+    - API field name for token limit
+    - Usually auto-detected
+    - Override if provider uses non-standard field
+  
+  request_timeout: 300
+    - Request timeout in seconds
+    - Default: 120 seconds if omitted or <= 0
+    - Increase for slow models or long operations
+
+LOAD BALANCING:
+  Configure multiple endpoints with same model_name for automatic round-robin:
+  
+  {
+    "model_list": [
+      {
+        "model_name": "gpt-5.2",
+        "model": "openai/gpt-5.2",
+        "api_base": "https://api1.example.com/v1",
+        "api_key": "sk-key1"
+      },
+      {
+        "model_name": "gpt-5.2",
+        "model": "openai/gpt-5.2",
+        "api_base": "https://api2.example.com/v1",
+        "api_key": "sk-key2"
+      }
+    ]
+  }
+
+MIGRATION FROM OLD PROVIDERS CONFIG:
+  Old (deprecated):  providers.zhipu.api_key + agents.defaults.provider
+  New (recommended): model_list[].model_name + agents.defaults.model_name
+
+═══════════════════════════════════════════════════════════════════════════════
+3. CHANNELS CONFIGURATION (Chat Apps)
+═══════════════════════════════════════════════════════════════════════════════
+
+All webhook-based channels (LINE, WeCom, etc.) are served on a single shared
+Gateway HTTP server (gateway.host:gateway.port, default 127.0.0.1:18790).
+Feishu uses WebSocket/SDK mode and does not use the shared HTTP webhook server.
+
+COMMON FIELDS (all channels):
+  enabled: true/false
+    - Enable/disable this channel
+  
+  allow_from: ["user_id1", "user_id2"]
+    - User ID whitelist
+    - Empty array = allow all users
+    - Specify user IDs to restrict access
+  
+  reasoning_channel_id: "channel_id"
+    - Channel/thread for extended reasoning output
+    - Optional: for o1/thinking models
+  
+  proxy: "http://host:port"
+    - HTTP/HTTPS proxy for channel connections
+    - Optional: useful in restrictive networks
+
+TELEGRAM:
+  Setup: Easy (just a token from @BotFather)
+  
+  token: "YOUR_BOT_TOKEN"
+    - Bot token from @BotFather
+    - Get: Open Telegram -> @BotFather -> /newbot
+  
+  base_url: ""
+    - Custom Telegram API endpoint (optional)
+    - Leave empty for default (api.telegram.org)
+
+DISCORD:
+  Setup: Easy (bot token + intents)
+  
+  token: "YOUR_BOT_TOKEN"
+    - Bot token from Discord Developer Portal
+    - Get: https://discord.com/developers/applications
+    - Enable MESSAGE CONTENT INTENT in Bot settings
+  
+  group_trigger.mention_only: false
+    - true = bot only responds to @mentions in servers
+    - false = bot responds to all messages (default)
+  
+  group_trigger.prefixes: ["!bot"]
+    - Trigger bot with keyword prefixes
+    - Example: ["!", "/", "bot"]
+
+WHATSAPP:
+  Setup: Easy (QR scan for native, or bridge URL)
+  
+  use_native: true/false
+    - true = in-process using whatsmeow (recommended)
+    - false = external WebSocket bridge
+    - Native requires build with -tags whatsapp_native
+  
+  bridge_url: "ws://localhost:3001"
+    - WebSocket bridge URL (if use_native=false)
+  
+  session_store_path: ""
+    - Path to store session data
+    - Empty = use <workspace>/whatsapp/
+
+QQ:
+  Setup: Easy (AppID + AppSecret)
+  
+  app_id: "YOUR_APP_ID"
+    - Application ID from QQ Open Platform
+    - Get: https://q.qq.com
+  
+  app_secret: "YOUR_APP_SECRET"
+    - Application secret
+
+DINGTALK:
+  Setup: Medium (app credentials)
+  
+  client_id: "YOUR_CLIENT_ID"
+    - Client ID from DingTalk Open Platform
+    - Get: https://open.dingtalk.com
+  
+  client_secret: "YOUR_CLIENT_SECRET"
+    - Client secret
+
+FEISHU:
+  Setup: Medium (app credentials + encryption)
+  Note: Uses WebSocket/SDK mode (not shared Gateway HTTP server)
+  
+  app_id: "cli_xxx"
+    - App ID from Feishu Developer Console
+  
+  app_secret: "xxx"
+    - App secret
+  
+  encrypt_key: "43_char_key"
+    - 43-character message encryption key
+    - From Feishu App Dashboard > Event Subscriptions
+  
+  verification_token: "token"
+    - Webhook verification token
+
+SLACK:
+  Setup: Medium (Bot token + App token for Socket Mode)
+  
+  bot_token: "xoxb-..."
+    - Bot User OAuth Token
+    - Get: App Dashboard > OAuth & Permissions
+  
+  app_token: "xapp-..."
+    - App-Level Token for Socket Mode
+    - Get: App Dashboard > Basic Information
+
+LINE:
+  Setup: Medium (credentials + webhook URL)
+  
+  channel_secret: "YOUR_CHANNEL_SECRET"
+    - Channel secret from LINE Developers Console
+    - Verifies webhook signatures
+  
+  channel_access_token: "YOUR_CHANNEL_ACCESS_TOKEN"
+    - Long-lived access token for sending messages
+  
+  webhook_path: "/webhook/line"
+    - Local webhook endpoint path
+    - Full URL: http://gateway.host:gateway.port/webhook/line
+    - Requires HTTPS (use ngrok or reverse proxy)
+
+ONEBOT:
+  Setup: Medium (WebSocket connection to go-cqhttp/similar)
+  
+  ws_url: "ws://127.0.0.1:3001"
+    - WebSocket connection URL to OneBot implementation
+  
+  access_token: "optional_token"
+    - Optional access token for securing WebSocket
+  
+  reconnect_interval: 5
+    - Seconds between reconnection attempts
+    - 0 = no auto-reconnect
+  
+  group_trigger_prefix: ["!", "/"]
+    - Message prefixes that trigger bot in groups
+    - Empty = all messages (if not mention_only)
+
+WECOM (Enterprise WeChat - 3 types):
+
+  1) WeCom Bot (wecom):
+     Easier setup, supports group chats
+     
+     token: "YOUR_TOKEN"
+       - Token from WeCom Admin Console
+     
+     encoding_aes_key: "43_CHAR_KEY"
+       - 43-character AES key for encryption/decryption
+     
+     webhook_url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=xxx"
+       - Webhook URL for sending messages
+     
+     webhook_path: "/webhook/wecom"
+       - Local webhook endpoint path
+     
+     reply_timeout: 5
+       - Max seconds to wait before reply timeout
+       - Passive message mode only
+
+  2) WeCom App (wecom_app):
+     More features, proactive messaging, private chat only
+     
+     corp_id: "wwxxxxxxxxxxxxxxxx"
+       - Enterprise ID from WeCom Admin Console
+     
+     corp_secret: "YOUR_CORP_SECRET"
+       - Application secret
+     
+     agent_id: 1000002
+       - Application agent ID (numeric)
+     
+     token: "YOUR_TOKEN"
+       - Token for webhook verification
+     
+     encoding_aes_key: "43_CHAR_KEY"
+       - AES encryption key
+     
+     webhook_path: "/webhook/wecom-app"
+       - Local webhook endpoint path
+
+  3) WeCom AI Bot (wecom_aibot):
+     Official AI Bot, streaming replies, group + private chat
+     
+     token: "YOUR_TOKEN"
+       - Token from AI Bot settings
+     
+     encoding_aes_key: "43_CHAR_KEY"
+       - AES key (click "Random Generate")
+     
+     webhook_path: "/webhook/wecom-aibot"
+       - Local webhook endpoint path
+     
+     max_steps: 10
+       - Maximum interaction steps per conversation
+       - Prevents infinite loops
+     
+     welcome_message: "Hello! How can I help?"
+       - Initial greeting message
+
+═══════════════════════════════════════════════════════════════════════════════
+4. GATEWAY CONFIGURATION
+═══════════════════════════════════════════════════════════════════════════════
+
+Gateway serves webhook-based channels (LINE, WeCom, etc.) on a single HTTP server.
+
+gateway:
+  host: "127.0.0.1"
+    - Bind address for gateway server
+    - "127.0.0.1" = localhost only (secure, default)
+    - "0.0.0.0" = all interfaces (required for Docker/remote access)
+    - Security: Use 127.0.0.1 for local-only access
+  
+  port: 18790
+    - Gateway server port
+    - Default: 18790
+    - Change if port already in use
+    - Remember to update web interface and channel configs
+    - Valid range: 1024-65535
+  
+  cors_origins: ["http://localhost:3000"]
+    - Allowed CORS origins for web interface
+    - ["*"] = allow all origins (development only)
+    - Specify URLs for production security
+    - Example: ["http://localhost:3000", "https://app.example.com"]
+
+Environment Variables:
+  PICOCLAW_GATEWAY_HOST=0.0.0.0  # Override bind address
+  PICOCLAW_GATEWAY_PORT=8080     # Override port
+
+═══════════════════════════════════════════════════════════════════════════════
+5. SESSION CONFIGURATION
+═══════════════════════════════════════════════════════════════════════════════
+
+Controls how conversation sessions are tracked across channels.
+
+session:
+  dm_scope: "per-channel-peer" | "per-peer" | "global"
+    - Session tracking strategy
+    
+    "per-channel-peer" (default):
+      - Separate session per platform+user
+      - Discord ID #123 ≠ Telegram ID 123
+      - Most secure and predictable
+    
+    "per-peer":
+      - Shared session across platforms for same user
+      - Discord ID #123 = Telegram ID 123 = same user
+      - Requires user ID mapping
+    
+    "global":
+      - Single session for everyone
+      - All users share same conversation history
+      - Testing only, not for production
+
+═══════════════════════════════════════════════════════════════════════════════
+6. VOICE CONFIGURATION
+═══════════════════════════════════════════════════════════════════════════════
+
+Voice input/output capabilities for audio messages.
+
+voice:
+  stt_engine: "cli" | "api"
+    - Speech-to-Text engine type
+    - "cli" = local executable (whisper, vosk)
+    - "api" = cloud service (Groq, etc.)
+    - CLI requires stt_executable path
+  
+  stt_executable: "/path/to/whisper"
+    - Path to local STT executable
+    - Only used when stt_engine="cli"
+    - Must be in PATH or use absolute path
+    - Examples: whisper, vosk
+  
+  tts_engine: "espeak" | "festival" | "google" | "azure" | "elevenlabs"
+    - Text-to-Speech engine
+    - Options vary by platform
+    - Common: espeak, festival, google, azure, elevenlabs
+  
+  tts_voice: "en-US-Neural2-A"
+    - Default voice identifier for TTS engine
+    - Format depends on engine
+    - Google: "en-US-Neural2-A"
+    - ElevenLabs: voice ID
+    - espeak: "en", "en-us"
+
+NOTE: Groq provides free voice transcription via Whisper. If groq provider is
+configured, audio messages from any channel will be automatically transcribed
+at the agent level.
+
+═══════════════════════════════════════════════════════════════════════════════
+7. LOGGING CONFIGURATION
+═══════════════════════════════════════════════════════════════════════════════
+
+logging:
+  level: "debug" | "info" | "warn" | "error"
+    - Log verbosity level
+    - "debug" = everything (troubleshooting)
+    - "info" = general operations (production)
+    - "warn" = warnings only
+    - "error" = errors only
+  
+  file: "~/.picoclaw/logs/gateway.log"
+    - Path to log file
+    - Empty = console-only logging
+    - Use absolute path or ~/.picoclaw/logs/
+    - File rotates at max_size
+  
+  max_size: 100
+    - Maximum log file size in MB before rotation
+    - When reached, old logs archived and new file starts
+    - Typical: 10-100 MB
+
+═══════════════════════════════════════════════════════════════════════════════
+8. TOOLS CONFIGURATION
+═══════════════════════════════════════════════════════════════════════════════
+
+Tools extend agent capabilities with external services and commands.
+
+═══════════════════════════════════════════════════════════════════════════════
+8.1 WEB TOOLS (Web Search)
+═══════════════════════════════════════════════════════════════════════════════
+
+PicoClaw supports multiple web search providers with automatic fallback.
+
+SEARCH PROVIDER PRIORITY:
+  1. Perplexity (if enabled) - AI-powered search with citations
+  2. Brave Search (if enabled) - Privacy-focused paid API
+  3. SearXNG (if enabled) - Self-hosted metasearch (70+ engines)
+  4. Tavily (if enabled) - AI-optimized search API
+  5. DuckDuckGo (default fallback) - No API key required
+  6. GLM Search (if enabled) - Chinese search engine
+
+tools.web.brave:
+  enabled: false
+    - Enable Brave Search API
+  
+  api_key: "BSA..."
+    - Brave Search API key
+    - Get: https://brave.com/search/api
+    - Pricing: $5/1000 queries (~$5-6/month)
+  
+  max_results: 5
+    - Maximum search results to return
+    - Typical: 5-10
+
+tools.web.perplexity:
+  enabled: false
+    - Enable Perplexity AI Search
+  
+  api_key: "YOUR_KEY"
+    - Perplexity API key
+    - Get: https://www.perplexity.ai
+    - Best quality results with AI summaries
+  
+  max_results: 5
+    - Maximum results
+
+tools.web.searxng:
+  enabled: false
+    - Enable SearXNG metasearch
+  
+  base_url: "http://localhost:8888"
+    - SearXNG instance URL
+    - Self-host: https://github.com/searxng/searxng
+    - Benefits: free, no API key, aggregates 70+ engines
+    - Perfect for cloud VMs (solves datacenter IP blocking)
+  
+  max_results: 5
+    - Maximum results
+
+tools.web.tavily:
+  enabled: false
+    - Enable Tavily Search API
+  
+  api_key: "YOUR_KEY"
+    - Tavily API key
+    - Get: https://tavily.com
+    - Pricing: 1000 queries free/month
+    - AI-optimized search for agents
+  
+  base_url: ""
+    - Custom Tavily endpoint (optional)
+  
+  max_results: 5
+    - Maximum results
+
+tools.web.duckduckgo:
+  enabled: true
+    - Enable DuckDuckGo search
+    - Default: true (automatic fallback)
+    - No API key required
+    - Free, privacy-focused
+  
+  max_results: 5
+    - Maximum results
+
+tools.web.glm_search:
+  enabled: false
+    - Enable GLM Search (Chinese)
+  
+  api_key: "YOUR_KEY"
+    - GLM API key
+    - Get: https://open.bigmodel.cn
+    - Best for Chinese language searches
+  
+  base_url: "https://open.bigmodel.cn/api/paas/v4/web_search"
+    - GLM Search API endpoint
+  
+  search_engine: "search_std"
+    - Search engine type
+  
+  max_results: 5
+    - Maximum results
+
+tools.web.fetch_limit_bytes: 10485760
+  - Maximum bytes to fetch from web pages
+  - Default: 10MB (10485760 bytes)
+  - Prevents memory issues with large pages
+
+═══════════════════════════════════════════════════════════════════════════════
+8.2 EXEC TOOL (Command Execution)
+═══════════════════════════════════════════════════════════════════════════════
+
+Execute shell commands with security controls.
+
+tools.exec:
+  enabled: true
+    - Enable command execution tool
+  
+  enable_deny_patterns: true
+    - Enable default dangerous command blocking
+    - true = block dangerous commands (recommended)
+    - false = disable blocking (SECURITY RISK)
+    
+    DEFAULT BLOCKED PATTERNS:
+      - Delete: rm -rf, del /f/q, rmdir /s
+      - Disk ops: format, mkfs, diskpart, dd if=, writing to /dev/sd*
+      - System: shutdown, reboot, poweroff
+      - Command substitution: $(), ${}, backticks
+      - Pipe to shell: | sh, | bash
+      - Privilege: sudo, chmod, chown
+      - Process: pkill, killall, kill -9
+      - Remote: curl | sh, wget | sh, ssh
+      - Package management: apt, yum, dnf, npm install -g, pip install --user
+      - Containers: docker run, docker exec
+      - Git: git push, git force
+      - Other: eval, source *.sh
+  
+  custom_deny_patterns: ["\\brm\\s+-r\\b", "\\bkillall\\s+python"]
+    - Additional regex patterns to block
+    - Array of regular expressions
+    - Enhances security beyond defaults
+    - null or [] = no custom patterns
+  
+  custom_allow_patterns: null
+    - Regex patterns to explicitly allow
+    - Overrides deny patterns
+    - Use with caution
+
+Environment Variables:
+  PICOCLAW_TOOLS_EXEC_ENABLE_DENY_PATTERNS=false
+  PICOCLAW_TOOLS_EXEC_ENABLED=true
+
+═══════════════════════════════════════════════════════════════════════════════
+8.3 CRON TOOL (Scheduled Tasks)
+═══════════════════════════════════════════════════════════════════════════════
+
+Schedule commands to run automatically at specified times using cron expressions.
+
+tools.cron:
+  enabled: true
+    - Enable scheduled tasks
+  
+  exec_timeout_minutes: 5
+    - Execution timeout for cron jobs in minutes
+    - 0 = unlimited (not recommended)
+    - Prevents runaway jobs
+    - Typical: 5-15 minutes
+  
+  jobs: [
+    {
+      name: "daily-backup"
+        - Friendly identifier for this job
+        - Used in logs and monitoring
+      
+      schedule: "0 2 * * *"
+        - Cron expression (minute hour day month weekday)
+        - "0 2 * * *" = every day at 2am
+        - "*/15 * * * *" = every 15 minutes
+        - "0 */6 * * *" = every 6 hours
+        - "0 9 * * 1-5" = weekdays at 9am
+      
+      enabled: true
+        - Enable/disable this job without deleting it
+      
+      command: "/path/to/backup.sh"
+        - Shell command to execute
+        - Respects exec tool deny patterns
+        - Use absolute paths
+    }
+  ]
+
+CLI COMMANDS:
+  picoclaw cron list           # List all scheduled jobs
+  picoclaw cron add ...        # Add a scheduled job
+
+CRON EXPRESSION EXAMPLES:
+  0 * * * *      = every hour
+  */30 * * * *   = every 30 minutes
+  0 9 * * *      = daily at 9am
+  0 9 * * 1      = every Monday at 9am
+  0 0 1 * *      = first day of month at midnight
+  0 9,17 * * *   = daily at 9am and 5pm
+
+Jobs stored in: ~/.picoclaw/workspace/cron/
+
+Environment Variables:
+  PICOCLAW_TOOLS_CRON_EXEC_TIMEOUT_MINUTES=10
+  PICOCLAW_TOOLS_CRON_ENABLED=true
+
+═══════════════════════════════════════════════════════════════════════════════
+8.4 MCP TOOL (Model Context Protocol)
+═══════════════════════════════════════════════════════════════════════════════
+
+Connect external tools and services through the Model Context Protocol.
+Enables integration with filesystems, databases, APIs, and more via
+standardized server plugins.
+
+tools.mcp:
+  enabled: false
+    - Enable MCP integration globally
+  
+  servers:
+    <server_name>:
+      enabled: true
+        - Enable this specific MCP server
+      
+      type: "stdio" | "sse" | "http"
+        - Transport type
+        - "stdio" = local process communication
+        - "sse" = Server-Sent Events (streaming)
+        - "http" = REST API
+        - Auto-detected if omitted:
+          - url set → "sse"
+          - command set → "stdio"
+      
+      command: "npx"
+        - Executable command (stdio only)
+        - Examples: "npx", "node", "python", "/usr/bin/mcp-server"
+        - Use full path if not in PATH
+      
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"]
+        - Command arguments array (stdio only)
+        - Passed to command
+      
+      env: {"API_KEY": "value"}
+        - Environment variables (stdio only)
+        - JSON object format
+        - Pass API keys securely
+      
+      env_file: "/path/to/.env"
+        - Path to .env file (stdio only)
+        - Alternative to env field
+        - More secure for keys
+      
+      url: "https://mcp.example.com/mcp"
+        - Endpoint URL (sse/http only)
+        - For remote MCP servers
+      
+      headers: {"Authorization": "Bearer TOKEN"}
+        - HTTP headers (sse/http only)
+        - JSON object format
+        - For authenticated servers
+
+EXAMPLE: Filesystem MCP Server (stdio)
+  {
+    "tools": {
+      "mcp": {
+        "enabled": true,
+        "servers": {
+          "filesystem": {
+            "enabled": true,
+            "command": "npx",
+            "args": [
+              "-y",
+              "@modelcontextprotocol/server-filesystem",
+              "/tmp"
+            ]
+          }
+        }
+      }
+    }
+  }
+
+EXAMPLE: Remote HTTP MCP Server
+  {
+    "tools": {
+      "mcp": {
+        "enabled": true,
+        "servers": {
+          "context7": {
+            "enabled": true,
+            "type": "http",
+            "url": "https://mcp.context7.com/mcp",
+            "headers": {
+              "CONTEXT7_API_KEY": "ctx7sk-xx"
+            }
+          }
+        }
+      }
+    }
+  }
+
+EXAMPLE: GitHub MCP Server
+  {
+    "filesystem": {
+      "enabled": true,
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_TOKEN"
+      }
+    }
+  }
+
+OFFICIAL MCP SERVERS:
+  @modelcontextprotocol/server-filesystem - File system access
+  @modelcontextprotocol/server-github - GitHub integration
+  @modelcontextprotocol/server-brave-search - Brave Search
+  @modelcontextprotocol/server-postgres - PostgreSQL access
+  @modelcontextprotocol/server-slack - Slack integration
+
+Environment Variables:
+  PICOCLAW_TOOLS_MCP_ENABLED=true
+
+═══════════════════════════════════════════════════════════════════════════════
+8.5 SKILLS TOOL (Skill Discovery & Installation)
+═══════════════════════════════════════════════════════════════════════════════
+
+Discover and install skills from registries like ClawHub.
+
+tools.skills:
+  enabled: true
+    - Enable skill discovery and installation
+  
+  registries.clawhub:
+    enabled: true
+      - Enable ClawHub registry
+    
+    base_url: "https://clawhub.ai"
+      - ClawHub base URL
+    
+    auth_token: ""
+      - Optional Bearer token for higher rate limits
+      - Leave empty for public access
+    
+    search_path: "/api/v1/search"
+      - Search API endpoint path
+    
+    skills_path: "/api/v1/skills"
+      - Skills API endpoint path
+    
+    download_path: "/api/v1/download"
+      - Download API endpoint path
+    
+    timeout: 0
+      - Request timeout in seconds
+      - 0 = use default
+    
+    max_zip_size: 0
+      - Maximum skill ZIP size in bytes
+      - 0 = no limit
+    
+    max_response_size: 0
+      - Maximum API response size in bytes
+      - 0 = no limit
+  
+  max_concurrent_searches: 2
+    - Maximum parallel skill searches
+    - Prevents overwhelming registry
+  
+  search_cache:
+    max_size: 50
+      - Maximum cached search results
+    
+    ttl_seconds: 300
+      - Cache time-to-live in seconds
+      - 300 = 5 minutes
+
+SKILL SOURCES (load order):
+  1. ~/.picoclaw/workspace/skills (workspace)
+  2. ~/.picoclaw/skills (global)
+  3. <current-working-directory>/skills (builtin)
+
+Override builtin skills:
+  export PICOCLAW_BUILTIN_SKILLS=/path/to/skills
+
+═══════════════════════════════════════════════════════════════════════════════
+8.6 OTHER TOOLS
+═══════════════════════════════════════════════════════════════════════════════
+
+tools.media_cleanup:
+  enabled: true
+    - Enable automatic media file cleanup
+  
+  max_age_minutes: 30
+    - Delete media files older than this
+  
+  interval_minutes: 5
+    - Cleanup check interval
+
+tools.append_file:
+  enabled: true
+    - Add content to end of existing files
+    - Respects workspace restrictions
+
+tools.edit_file:
+  enabled: true
+    - Modify existing files by replacing sections
+    - Respects workspace restrictions
+
+tools.read_file:
+  enabled: true
+    - Read and analyze file contents
+    - Respects workspace restrictions
+
+tools.write_file:
+  enabled: true
+    - Create or overwrite files
+    - Respects workspace restrictions
+
+tools.list_dir:
+  enabled: true
+    - Browse directory contents
+    - Respects workspace restrictions
+
+tools.find_skills:
+  enabled: true
+    - Search for available skills
+
+tools.install_skill:
+  enabled: true
+    - Download and install skills
+
+tools.message:
+  enabled: true
+    - Send messages to channels/users
+    - Used by subagents for communication
+
+tools.spawn:
+  enabled: true
+    - Launch background processes/subagents
+    - For long-running tasks
+
+tools.subagent:
+  enabled: true
+    - Create child agent instances
+
+tools.web_fetch:
+  enabled: true
+    - Fetch web page contents
+
+tools.i2c:
+  enabled: false
+    - I2C hardware communication
+    - For embedded systems
+
+tools.spi:
+  enabled: false
+    - SPI hardware communication
+    - For embedded systems
+
+═══════════════════════════════════════════════════════════════════════════════
+9. HEARTBEAT (Periodic Tasks)
+═══════════════════════════════════════════════════════════════════════════════
+
+Automatic periodic task execution based on HEARTBEAT.md file.
+
+heartbeat:
+  enabled: true
+    - Enable/disable heartbeat
+  
+  interval: 30
+    - Check interval in minutes
+    - Minimum: 5 minutes
+    - Default: 30 minutes
+    - Agent reads ~/.picoclaw/workspace/HEARTBEAT.md every interval
+
+HEARTBEAT.MD FORMAT:
+  Create ~/.picoclaw/workspace/HEARTBEAT.md:
+  
+  # Periodic Tasks
+  
+  ## Quick Tasks (respond directly)
+  - Report current time
+  - Check system status
+  
+  ## Long Tasks (use spawn for async)
+  - Search the web for AI news and summarize
+  - Check email and report important messages
+
+ASYNC TASKS WITH SPAWN:
+  For long-running tasks, use spawn tool to create subagent:
+  
+  spawn → creates independent subagent
+       → doesn't block heartbeat
+       → subagent uses "message" tool to communicate
+       → results sent directly to user
+
+BEHAVIOR:
+  - Heartbeat triggers every <interval> minutes
+  - Agent reads HEARTBEAT.md
+  - Executes tasks sequentially
+  - Spawned subagents work independently
+  - Subagents communicate via message tool
+
+Environment Variables:
+  PICOCLAW_HEARTBEAT_ENABLED=false
+  PICOCLAW_HEARTBEAT_INTERVAL=60
+
+═══════════════════════════════════════════════════════════════════════════════
+10. DEVICES (USB Monitoring)
+═══════════════════════════════════════════════════════════════════════════════
+
+devices:
+  enabled: false
+    - Enable device monitoring
+  
+  monitor_usb: true
+    - Monitor USB device connections
+    - Detect new devices automatically
+
+═══════════════════════════════════════════════════════════════════════════════
+11. WORKSPACE LAYOUT
+═══════════════════════════════════════════════════════════════════════════════
+
+Default: ~/.picoclaw/workspace/
+
+STRUCTURE:
+  sessions/          - Conversation sessions and history by channel/user
+  memory/            - Long-term memory (MEMORY.md)
+  state/             - Persistent state (last channel, preferences)
+  cron/              - Scheduled jobs database
+  skills/            - Custom user skills
+  whatsapp/          - WhatsApp session data (if native mode)
+  AGENTS.md          - Agent behavior rules and guidelines
+  HEARTBEAT.md       - Periodic task prompts (checked every interval)
+  IDENTITY.md        - Agent identity and personality
+  SOUL.md            - Agent soul and core values
+  TOOLS.md           - Tool usage documentation
+  USER.md            - User preferences and information
+
+These markdown files customize agent behavior:
+  - AGENTS.md: Define agent roles and behavior patterns
+  - IDENTITY.md: Set agent name, personality, communication style
+  - SOUL.md: Define agent values, ethics, decision-making principles
+  - USER.md: Store user preferences, communication style, context
+  - HEARTBEAT.md: List periodic tasks to execute automatically
+
+═══════════════════════════════════════════════════════════════════════════════
+12. SECURITY SANDBOX
+═══════════════════════════════════════════════════════════════════════════════
+
+When restrict_to_workspace: true (default), the following tools are sandboxed:
+
+PROTECTED TOOLS:
+  - read_file: Only files within workspace
+  - write_file: Only files within workspace
+  - list_dir: Only directories within workspace
+  - edit_file: Only files within workspace
+  - append_file: Only files within workspace
+  - exec: Command paths must be within workspace
+
+ADDITIONAL EXEC PROTECTION:
+  Even with restrict_to_workspace: false, exec tool blocks:
+  - rm -rf, del /f, rmdir /s (bulk deletion)
+  - format, mkfs, diskpart (disk formatting)
+  - dd if= (disk imaging)
+  - Writing to /dev/sd[a-z] (direct disk writes)
+  - shutdown, reboot, poweroff (system shutdown)
+  - Fork bomb: :(){ :|:& };:
+
+SECURITY BOUNDARY CONSISTENCY:
+  All execution paths inherit same restriction:
+  - Main agent: respects restrict_to_workspace
+  - Subagents: inherit same restriction
+  - Heartbeat tasks: inherit same restriction
+  - Spawned processes: inherit same restriction
+
+DISABLING RESTRICTIONS (SECURITY RISK):
+  Config:
+    "restrict_to_workspace": false
+  
+  Environment variable:
+    PICOCLAW_AGENTS_DEFAULTS_RESTRICT_TO_WORKSPACE=false
+  
+  ⚠️ WARNING: Allows agent to access any path on your system
+
+═══════════════════════════════════════════════════════════════════════════════
+13. ENVIRONMENT VARIABLE OVERRIDES
+═══════════════════════════════════════════════════════════════════════════════
+
+All config options can be overridden via environment variables:
+
+FORMAT: PICOCLAW_<SECTION>_<KEY>
+
+EXAMPLES:
+  PICOCLAW_AGENTS_DEFAULTS_MODEL_NAME=gpt4
+  PICOCLAW_AGENTS_DEFAULTS_MAX_TOKENS=16384
+  PICOCLAW_AGENTS_DEFAULTS_RESTRICT_TO_WORKSPACE=false
+  PICOCLAW_GATEWAY_HOST=0.0.0.0
+  PICOCLAW_GATEWAY_PORT=8080
+  PICOCLAW_TOOLS_WEB_BRAVE_ENABLED=true
+  PICOCLAW_TOOLS_WEB_BRAVE_API_KEY=BSA...
+  PICOCLAW_TOOLS_EXEC_ENABLE_DENY_PATTERNS=false
+  PICOCLAW_TOOLS_CRON_EXEC_TIMEOUT_MINUTES=10
+  PICOCLAW_TOOLS_MCP_ENABLED=true
+  PICOCLAW_HEARTBEAT_ENABLED=false
+  PICOCLAW_HEARTBEAT_INTERVAL=60
+
+SPECIAL:
+  PICOCLAW_CONFIG=/path/to/config.json
+    - Override config file location
+  
+  PICOCLAW_HOME=/path/to/data
+    - Override data directory (default ~/.picoclaw)
+  
+  PICOCLAW_BUILTIN_SKILLS=/path/to/skills
+    - Override builtin skills location
+
+Note: Nested map-style config (tools.mcp.servers.<name>.*) must be
+configured in config.json, not via environment variables.
+
+═══════════════════════════════════════════════════════════════════════════════
+14. CLI REFERENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+picoclaw onboard
+  - Initialize config & workspace
+  - Creates ~/.picoclaw/config.json and workspace structure
+
+picoclaw agent
+  - Interactive chat mode
+  - Press Ctrl+C or type 'exit' to quit
+
+picoclaw agent -m "message"
+  - One-shot question mode
+  - Example: picoclaw agent -m "What is 2+2?"
+
+picoclaw gateway
+  - Start gateway server
+  - Serves webhook-based channels (Telegram, Discord, LINE, etc.)
+
+picoclaw status
+  - Show picoclaw status
+  - Display configuration and system info
+
+picoclaw cron list
+  - List all scheduled jobs
+  - Shows name, schedule, enabled status
+
+picoclaw cron add NAME SCHEDULE COMMAND
+  - Add a scheduled job
+  - Example: picoclaw cron add backup "0 2 * * *" "/backup.sh"
+
+picoclaw auth login --provider <provider>
+  - OAuth login for providers (anthropic, gemini, etc.)
+  - Interactive browser-based authentication
+
+═══════════════════════════════════════════════════════════════════════════════
+15. TROUBLESHOOTING
+═══════════════════════════════════════════════════════════════════════════════
+
+COMMON ISSUES:
+
+1. Web search says "API key configuration issue"
+   - Normal if no search API key configured
+   - DuckDuckGo works without API key
+   - Consider: Brave ($5/month), SearXNG (free), Perplexity (best quality)
+
+2. Getting content filtering errors
+   - Some providers (Zhipu) have strict filtering
+   - Try rephrasing query
+   - Use different model
+
+3. Telegram "Conflict: terminated by other getUpdates"
+   - Multiple bot instances running
+   - Only one picoclaw gateway can run per bot token
+   - Stop other instances
+
+4. Docker gateway not accessible from host
+   - Gateway listens on 127.0.0.1 by default
+   - Set PICOCLAW_GATEWAY_HOST=0.0.0.0 or update config.json
+   - Required for external access
+
+5. Tool execution blocked
+   - Check restrict_to_workspace setting
+   - Verify exec enable_deny_patterns
+   - Check logs for specific error
+
+6. Model not responding
+   - Verify API key is correct
+   - Check api_base URL
+   - Verify request_timeout is sufficient
+   - Check provider status
+
+7. Channel not receiving messages
+   - Verify enabled: true
+   - Check token/credentials
+   - Verify allow_from list (empty = all users)
+   - For webhooks: check gateway is running
+   - Check logs for connection errors
+
+═══════════════════════════════════════════════════════════════════════════════
+16. GETTING API KEYS
+═══════════════════════════════════════════════════════════════════════════════
+
+LLM PROVIDERS:
+  OpenRouter:     https://openrouter.ai/keys
+  OpenAI:         https://platform.openai.com/api-keys
+  Anthropic:      https://console.anthropic.com/settings/keys
+  Zhipu (智谱):    https://open.bigmodel.cn/usercenter/proj-mgmt/apikeys
+  DeepSeek:       https://platform.deepseek.com/api_keys
+  Google Gemini:  https://aistudio.google.com/api-keys
+  Groq:           https://console.groq.com/keys
+  Moonshot:       https://platform.moonshot.cn/console/api-keys
+  Qwen (千问):     https://dashscope.console.aliyun.com/apiKey
+  NVIDIA:         https://build.nvidia.com/
+  Cerebras:       https://cerebras.ai/
+
+WEB SEARCH PROVIDERS:
+  Brave Search:   https://brave.com/search/api ($5/1000 queries)
+  Perplexity:     https://www.perplexity.ai (best quality)
+  SearXNG:        https://github.com/searxng/searxng (free, self-hosted)
+  Tavily:         https://tavily.com (1000 free queries/month)
+  DuckDuckGo:     No API key needed (built-in)
+
+CHANNEL PLATFORMS:
+  Telegram:       @BotFather
+  Discord:        https://discord.com/developers/applications
+  QQ:             https://q.qq.com
+  LINE:           https://developers.line.biz
+  Slack:          https://api.slack.com/apps
+  DingTalk:       https://open.dingtalk.com
+  Feishu:         https://open.feishu.cn
+  WeCom:          WeCom Admin Console
+
+═══════════════════════════════════════════════════════════════════════════════
+17. MIGRATION GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+MIGRATING FROM OLD PROVIDERS CONFIG TO MODEL_LIST:
+
+OLD FORMAT (DEPRECATED):
+  {
+    "providers": {
+      "zhipu": {
+        "api_key": "your-key",
+        "api_base": "https://open.bigmodel.cn/api/paas/v4"
+      }
+    },
+    "agents": {
+      "defaults": {
+        "provider": "zhipu",
+        "model": "glm-4.7"
+      }
+    }
+  }
+
+NEW FORMAT (RECOMMENDED):
+  {
+    "model_list": [
+      {
+        "model_name": "glm-4.7",
+        "model": "zhipu/glm-4.7",
+        "api_key": "your-key"
+      }
+    ],
+    "agents": {
+      "defaults": {
+        "model_name": "glm-4.7"
+      }
+    }
+  }
+
+BENEFITS OF NEW FORMAT:
+  - Zero-code provider addition
+  - Multi-model support
+  - Load balancing
+  - Model fallbacks
+  - Cleaner configuration
+  - Better multi-agent support
+
+See: docs/migration/model-list-migration.md
+
+═══════════════════════════════════════════════════════════════════════════════
+
+For more information:
+- Full README: README.md
+- Tools Configuration: docs/tools_configuration.md
+- Troubleshooting: docs/troubleshooting.md
+- GitHub: https://github.com/sipeed/picoclaw
+- Website: https://picoclaw.io
+- Discord: https://discord.gg/V4sAZ9XWpN
+
+═══════════════════════════════════════════════════════════════════════════════

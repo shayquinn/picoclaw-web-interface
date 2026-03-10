@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -11,615 +11,22 @@
                    media-src 'self' blob:;
                    img-src 'self' data:;">
     <title>PicoClaw</title>
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-
-        /* Register --s so the browser can interpolate it as a length */
-        @property --s {
-            syntax: '<length>';
-            inherits: true;
-            initial-value: 130px;
-        }
-
-        /* ── Geometric background pattern (seasonal colours via --c1/c2/c3) ── */
-        html {
-            --s:  130px;
-            --c1: #3730a3;
-            --c2: #6366f1;
-            --c3: #4f46e5;
-            --_g: var(--c1) 10%,var(--c2) 10.5% 19%,#0000 19.5% 80.5%,var(--c2) 81% 89.5%,var(--c3) 90%;
-            --_c: from -90deg at 37.5% 50%,#0000 75%;
-            --_l1: linear-gradient(145deg,var(--_g));
-            --_l2: linear-gradient( 35deg,var(--_g));
-        }
-        html::before {
-            content: '';
-            position: fixed;
-            inset: 0;
-            z-index: -1;
-            background:
-                var(--_l1) 50% 50%,
-                var(--_l1) calc(50% + var(--s)/2) calc(50% + var(--s)),
-                var(--_l2) 50% 50%,
-                var(--_l2) calc(50% + var(--s)/2) calc(50% + var(--s)),
-                conic-gradient(var(--_c),var(--c1) 0) calc(50% + var(--s)/8) 50%,
-                conic-gradient(var(--_c),var(--c3) 0) calc(50% + var(--s)/2) 50%,
-                linear-gradient(90deg,var(--c3) 38%,var(--c1) 0 50%,var(--c3) 0 62%,var(--c1) 0) 50% 50%;
-            background-size: var(--s) calc(2*var(--s)/3);
-            /* Slow breathe — animates --s so positions + size all scale together */
-            --s: 111px;
-            animation: patternBreathe 120s ease-in-out infinite;
-        }
-        /* Shared breathe keyframe — animates --s between the two tile sizes.
-           Layers are anchored at 50% 50% so the pattern breathes from the
-           centre of the element rather than the top-left corner. */
-        @keyframes patternBreathe {
-            0%,100% { --s: 120px; }
-            50%      { --s: 140px; }
-        }
-
-        html, body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            height: 100%;
-            overflow: hidden;
-            /* background removed — html::before provides the pattern */
-        }
-
-        .container {
-            background: rgba(255,255,255,0.88);
-            backdrop-filter: blur(8px);
-            -webkit-backdrop-filter: blur(8px);
-            width: 100vw;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-        }
-
-        /* Header */
-        .header {
-            position: relative;
-            overflow: hidden;
-            color: white;
-            padding: 14px 24px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-shrink: 0;
-            /* Fallback solid colour (overridden by ::before pattern) */
-            background: transparent;
-        }
-        /* Pattern tile pinned to the header — animates --s so all positions + size breathe in sync */
-        .header::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            z-index: 0;
-            background:
-                var(--_l1) 50% 50%,
-                var(--_l1) calc(50% + var(--s)/2) calc(50% + var(--s)),
-                var(--_l2) 50% 50%,
-                var(--_l2) calc(50% + var(--s)/2) calc(50% + var(--s)),
-                conic-gradient(var(--_c),var(--c1) 0) calc(50% + var(--s)/8) 50%,
-                conic-gradient(var(--_c),var(--c3) 0) calc(50% + var(--s)/2) 50%,
-                linear-gradient(90deg,var(--c3) 38%,var(--c1) 0 50%,var(--c3) 0 62%,var(--c1) 0) 50% 50%;
-            background-size: var(--s) calc(2*var(--s)/3);
-            --s: 111px;
-            animation: patternBreathe 90s ease-in-out infinite;
-            filter: brightness(0.75) saturate(1.2);
-        }
-        /* All direct children sit above the pattern */
-        .header > * { position: relative; z-index: 1; }
-        .header h1 { font-size: 1.3rem; font-weight: 700; display: flex; align-items: center; gap: 8px; }
-        .header .subtitle { margin-left: auto; opacity: 0.65; font-size: 0.8rem; }
-
-        /* App body */
-        .app-body { display: flex; flex: 1; overflow: hidden; min-height: 0; }
-
-        /* Sidebar */
-        .sidebar {
-            width: 210px;
-            min-width: 130px;
-            max-width: 480px;
-            flex-shrink: 0;
-            background: #f8f9fb;
-            border-right: 1px solid #e5e7eb;
-            display: flex;
-            flex-direction: column;
-            padding: 12px 8px;
-            gap: 4px;
-            overflow: hidden;
-        }
-
-        /* Resize handle */
-        .sidebar-resize {
-            width: 5px;
-            flex-shrink: 0;
-            cursor: col-resize;
-            background: transparent;
-            transition: background 0.15s;
-            z-index: 10;
-            position: relative;
-        }
-        .sidebar-resize:hover, .sidebar-resize.dragging { background: rgba(99,102,241,0.45); }
-
-        .new-chat-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 7px;
-            padding: 9px 12px;
-            background: #4338ca;
-            color: white;
-            border: none;
-            border-radius: 9px;
-            font-size: 0.87rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: background 0.2s;
-            flex-shrink: 0;
-        }
-        .new-chat-btn:hover { background: #3730a3; }
-
-        .sidebar-label {
-            font-size: 0.7rem;
-            font-weight: 700;
-            letter-spacing: 0.07em;
-            text-transform: uppercase;
-            color: #9ca3af;
-            padding: 10px 6px 2px;
-            flex-shrink: 0;
-        }
-
-        .chat-list {
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-            min-height: 0;
-        }
-
-        .chat-item {
-            display: flex;
-            align-items: center;
-            padding: 8px 9px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 0.86rem;
-            color: #374151;
-            transition: background 0.15s;
-            gap: 6px;
-            min-width: 0;
-            overflow: hidden;
-        }
-        .chat-item:hover { background: #ede9fe; }
-        .chat-item.active { background: #ede9fe; color: #4338ca; font-weight: 600; }
-        .chat-item-icon { flex-shrink: 0; font-size: 0.85rem; opacity: 0.5; }
-
-        /* Name: gradient fade at right edge */
-        .chat-item-name {
-            flex: 1;
-            white-space: nowrap;
-            overflow: hidden;
-            min-width: 0;
-            -webkit-mask-image: linear-gradient(to right, black 70%, transparent 100%);
-            mask-image: linear-gradient(to right, black 70%, transparent 100%);
-        }
-        .chat-item-name[contenteditable="true"] {
-            outline: none;
-            background: white;
-            border-radius: 4px;
-            padding: 1px 4px;
-            -webkit-mask-image: none;
-            mask-image: none;
-            min-width: 60px;
-        }
-
-        .chat-item-delete {
-            flex-shrink: 0;
-            width: 18px;
-            height: 18px;
-            border: none;
-            background: transparent;
-            color: #9ca3af;
-            cursor: pointer;
-            border-radius: 4px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.78rem;
-        }
-        .chat-item:hover .chat-item-delete { display: flex; }
-        .chat-item-delete:hover { background: #fca5a5; color: #dc2626; }
-        .chat-item-rename {
-            flex-shrink: 0;
-            width: 18px;
-            height: 18px;
-            border: none;
-            background: transparent;
-            color: #9ca3af;
-            cursor: pointer;
-            border-radius: 4px;
-            display: none;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.78rem;
-        }
-        .chat-item:hover .chat-item-rename { display: flex; }
-        .chat-item-rename:hover { background: #e0e7ff; color: #4338ca; }
-
-        /* Main area */
-        .main-area {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            padding: 18px 26px 14px;
-            gap: 10px;
-            min-width: 0;
-        }
-
-        .chat-title-bar {
-            font-size: 0.93rem;
-            font-weight: 600;
-            color: #374151;
-            flex-shrink: 0;
-            cursor: pointer;
-            user-select: none;
-        }
-        .chat-title-bar:hover::after { content: ' ✏'; opacity: 0.4; font-size: 0.8rem; }
-
-        .messages {
-            flex: 1;
-            overflow-y: auto;
-            border: 1px solid #e5e7eb;
-            border-radius: 14px;
-            padding: 18px 22px;
-            background: #f9fafb;
-            min-height: 0;
-        }
-
-        .message {
-            margin-bottom: 14px;
-            padding: 11px 15px;
-            border-radius: 12px;
-            max-width: 78%;
-            animation: fadeIn 0.22s ease;
-            font-size: 0.93rem;
-            line-height: 1.55;
-        }
-        .message.user { background: #4338ca; color: white; margin-left: auto; border-bottom-right-radius: 4px; }
-        .message.assistant { background: white; color: #1f2937; border: 1px solid #e5e7eb; margin-right: auto; border-bottom-left-radius: 4px; }
-        .message.system {
-            background: #fef3c7;
-            color: #92400e;
-            border: 1px solid #fbbf24;
-            margin: 0 auto 14px;
-            text-align: center;
-            font-size: 0.83rem;
-            max-width: 92%;
-        }
-        .message-meta { font-size: 0.73rem; font-weight: 600; margin-bottom: 4px; opacity: 0.65; }
-        .message { position: relative; cursor: pointer; }
-        .message.tts-selected { outline: 2px solid #a5b4fc; outline-offset: 2px; }
-        .message.tts-reading  { outline: 2px solid #6366f1; outline-offset: 2px; box-shadow: 0 0 0 4px rgba(99,102,241,0.15); }
-        @media (prefers-color-scheme: dark) {
-            .message.tts-selected { outline-color: #818cf8; }
-            .message.tts-reading  { outline-color: #818cf8; box-shadow: 0 0 0 4px rgba(129,140,248,0.18); }
-        }
-
-        .input-area { display: flex; gap: 9px; flex-shrink: 0; }
-        .input-area input {
-            flex: 1;
-            padding: 12px 17px;
-            border: 1.5px solid #e5e7eb;
-            border-radius: 12px;
-            font-size: 0.93rem;
-            transition: border-color 0.2s, box-shadow 0.2s;
-            background: white;
-            color: #1f2937;
-            min-width: 0;
-        }
-        .input-area input:focus { outline: none; border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.12); }
-        .input-area input.listening {
-            border-color: #ef4444;
-            background: linear-gradient(
-                to right,
-                rgba(239,68,68, var(--audio-level, 0.08)) 0%,
-                rgba(249,168,212, calc(var(--audio-level, 0.08) * 0.6)) calc(var(--audio-pct, 18%) * 1.2),
-                transparent var(--audio-pct, 18%)
-            );
-        }
-        @keyframes transcribeSweep {
-            0%   { background-position: -200% center; }
-            100% { background-position:  200% center; }
-        }
-        .input-area input.transcribing {
-            border-color: #fbbf24;
-            background: linear-gradient(90deg,
-                transparent 0%, rgba(251,191,36,0.18) 40%, rgba(251,191,36,0.35) 50%, rgba(251,191,36,0.18) 60%, transparent 100%
-            );
-            background-size: 200% 100%;
-            animation: transcribeSweep 1.2s linear infinite;
-            color: #92400e;
-        }
-        .input-area button {
-            padding: 12px 22px;
-            background: linear-gradient(135deg, #4338ca 0%, #5b21b6 100%);
-            color: white;
-            border: 1.5px solid transparent;
-            border-radius: 12px;
-            font-size: 0.93rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.2s;
-            flex-shrink: 0;
-        }
-        .input-area button:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(67,56,202,0.28); border-color: #a5b4fc; }
-        .input-area button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
-
-        .bottom-bar { display: flex; justify-content: flex-end; align-items: center; flex-shrink: 0; }
-
-        .status-indicator { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: #6b7280; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #10b981; animation: pulse 2s infinite; flex-shrink: 0; }
-        .status-dot.connecting { background: #f59e0b; }
-        .status-dot.error { background: #ef4444; }
-
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
-        @keyframes typingPulse { 0%, 60%, 100% { transform: scale(1); opacity: 0.5; } 30% { transform: scale(1.2); opacity: 1; } }
-        .typing-dot { width: 8px; height: 8px; background: #4338ca; border-radius: 50%; animation: typingPulse 1.4s infinite; }
-
-        @media (max-width: 680px) {
-            .sidebar { display: none; }
-            .sidebar-resize { display: none; }
-            .main-area { padding: 12px; }
-        }
-
-        @media (prefers-color-scheme: dark) {
-            /* html::before shows the pattern; container is frosted dark glass */
-            .container { background: rgba(17,24,39,0.90); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
-            .sidebar { background: #111827; border-color: #374151; }
-            .sidebar-label { color: #6b7280; }
-            .chat-item { color: #d1d5db; }
-            .chat-item:hover { background: #1e2a3a; }
-            .chat-item.active { background: #2d3748; color: #a5b4fc; }
-            .chat-item-name[contenteditable="true"] { background: #374151; color: #f9fafb; }
-            .chat-title-bar { color: #f9fafb; }
-            .messages { background: #111827; border-color: #374151; }
-            .message.assistant { background: #1f2937; color: #f9fafb; border-color: #374151; }
-            .message.system { background: #422006; color: #fcd34d; border-color: #92400e; }
-            .input-area input { background: #111827; border-color: #374151; color: #f9fafb; }
-            .input-area input::placeholder { color: #6b7280; }
-            .input-area input:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.2); }
-            .input-area input.transcribing {
-                border-color: #fbbf24;
-                background: linear-gradient(90deg,
-                    transparent 0%, rgba(251,191,36,0.12) 40%, rgba(251,191,36,0.25) 50%, rgba(251,191,36,0.12) 60%, transparent 100%
-                );
-                background-size: 200% 100%;
-                animation: transcribeSweep 1.2s linear infinite;
-                color: #fcd34d;
-            }
-            .input-area input.listening {
-                border-color: #f87171;
-                background: linear-gradient(
-                    to right,
-                    rgba(239,68,68, var(--audio-level, 0.15)) 0%,
-                    rgba(190,18,60, calc(var(--audio-level, 0.08) * 0.5)) calc(var(--audio-pct, 18%) * 1.2),
-                    #111827 var(--audio-pct, 18%)
-                );
-            }
-            .status-indicator { color: #9ca3af; }
-            .typing-dot { background: #818cf8; }
-            .sidebar-resize:hover, .sidebar-resize.dragging { background: rgba(129,140,248,0.4); }
-        }
-
-        /* ── Seasonal + time-of-day themes ──────────────────────────────────── */
-        #themeIndicator {
-            margin-left: auto;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.82rem;
-            opacity: 0.9;
-        }
-        .theme-emoji { font-size: 1.6rem; display: inline-block; line-height: 1; filter: drop-shadow(0 1px 3px rgba(0,0,0,0.35)); }
-
-        /* ── Pattern colour overrides per season ── */
-        html[data-season="spring"] { --c1: #276749; --c2: #34d399; --c3: #059669; }
-        html[data-season="summer"] { --c1: #0369a1; --c2: #38bdf8; --c3: #0077b6; }
-        html[data-season="autumn"] { --c1: #92400e; --c2: #fcd34d; --c3: #d97706; }
-        html[data-season="winter"] { --c1: #1e3a8a; --c2: #93c5fd; --c3: #0e7490; }
-
-        /* Spring — pattern colours set via html vars, no need to override .header background */
-        html[data-season="spring"] .header          { /* colour via --c1/c2/c3 */ }
-        html[data-season="spring"] .new-chat-btn    { background: #276749; }
-        html[data-season="spring"] .new-chat-btn:hover { background: #1a4731; }
-        html[data-season="spring"] .message.user    { background: #276749; }
-        html[data-season="spring"] .input-area button { background: linear-gradient(135deg, #276749 0%, #059669 100%); }
-        html[data-season="spring"] .input-area button:hover { box-shadow: 0 6px 16px rgba(39,103,73,0.28); }
-        html[data-season="spring"] .chat-item.active { color: #276749; background: #d1fae5; }
-        html[data-season="spring"] .input-area input:focus { border-color: #059669; box-shadow: 0 0 0 3px rgba(5,150,105,0.12); }
-        html[data-season="spring"] .sidebar-resize:hover,
-        html[data-season="spring"] .sidebar-resize.dragging { background: rgba(5,150,105,0.4); }
-
-        /* Summer */
-        html[data-season="summer"] .header          { /* colour via --c1/c2/c3 */ }
-        html[data-season="summer"] .new-chat-btn    { background: #0077b6; }
-        html[data-season="summer"] .new-chat-btn:hover { background: #005f94; }
-        html[data-season="summer"] .message.user    { background: #0077b6; }
-        html[data-season="summer"] .input-area button { background: linear-gradient(135deg, #0077b6 0%, #00b4d8 100%); }
-        html[data-season="summer"] .input-area button:hover { box-shadow: 0 6px 16px rgba(0,119,182,0.28); }
-        html[data-season="summer"] .chat-item.active { color: #0077b6; background: #e0f2fe; }
-        html[data-season="summer"] .input-area input:focus { border-color: #00b4d8; box-shadow: 0 0 0 3px rgba(0,180,216,0.12); }
-        html[data-season="summer"] .sidebar-resize:hover,
-        html[data-season="summer"] .sidebar-resize.dragging { background: rgba(0,180,216,0.4); }
-
-        /* Autumn */
-        html[data-season="autumn"] .header          { /* colour via --c1/c2/c3 */ }
-        html[data-season="autumn"] .new-chat-btn    { background: #92400e; }
-        html[data-season="autumn"] .new-chat-btn:hover { background: #78350f; }
-        html[data-season="autumn"] .message.user    { background: #b45309; }
-        html[data-season="autumn"] .input-area button { background: linear-gradient(135deg, #92400e 0%, #d97706 100%); }
-        html[data-season="autumn"] .input-area button:hover { box-shadow: 0 6px 16px rgba(146,64,14,0.28); }
-        html[data-season="autumn"] .chat-item.active { color: #92400e; background: #fef3c7; }
-        html[data-season="autumn"] .input-area input:focus { border-color: #d97706; box-shadow: 0 0 0 3px rgba(217,119,6,0.12); }
-        html[data-season="autumn"] .sidebar-resize:hover,
-        html[data-season="autumn"] .sidebar-resize.dragging { background: rgba(217,119,6,0.4); }
-
-        /* Winter */
-        html[data-season="winter"] .header          { /* colour via --c1/c2/c3 */ }
-        html[data-season="winter"] .new-chat-btn    { background: #1e3a8a; }
-        html[data-season="winter"] .new-chat-btn:hover { background: #1e40af; }
-        html[data-season="winter"] .message.user    { background: #1e3a8a; }
-        html[data-season="winter"] .input-area button { background: linear-gradient(135deg, #1e3a8a 0%, #0e7490 100%); }
-        html[data-season="winter"] .input-area button:hover { box-shadow: 0 6px 16px rgba(30,58,138,0.28); }
-        html[data-season="winter"] .chat-item.active { color: #1e3a8a; background: #dbeafe; }
-        html[data-season="winter"] .input-area input:focus { border-color: #0e7490; box-shadow: 0 0 0 3px rgba(14,116,144,0.12); }
-        html[data-season="winter"] .sidebar-resize:hover,
-        html[data-season="winter"] .sidebar-resize.dragging { background: rgba(14,116,144,0.4); }
-
-        /* ── TTS settings popover ────────────────────────────────────────────── */
-        .tts-settings-btn {
-            padding: 8px 9px;
-            background: #f3f4f6;
-            color: #6b7280;
-            border: 1.5px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 0.78rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            flex-shrink: 0;
-            line-height: 1;
-        }
-        .tts-settings-btn:hover { background: #ede9fe; border-color: #a5b4fc; color: #4338ca; }
-        .tts-popover {
-            display: none;
-            position: absolute;
-            bottom: calc(100% + 10px);
-            right: 0;
-            width: 270px;
-            background: #fff;
-            border: 1.5px solid #e5e7eb;
-            border-radius: 14px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.14);
-            padding: 16px 18px;
-            z-index: 200;
-            font-size: 0.88rem;
-            color: #374151;
-        }
-        .tts-popover.open { display: block; }
-        .tts-popover label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.82rem; color: #6b7280; }
-        .tts-popover select, .tts-popover input[type=range] { width: 100%; margin-bottom: 12px; }
-        .tts-popover select { padding: 5px 8px; border: 1.5px solid #e5e7eb; border-radius: 8px; background: #f9fafb; }
-        .tts-popover .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2px; }
-        .tts-popover .val { font-size: 0.8rem; color: #6366f1; font-weight: 700; min-width: 28px; text-align: right; }
-        @media (prefers-color-scheme: dark) {
-            .tts-settings-btn { background: #1f2937; color: #9ca3af; border-color: #374151; }
-            .tts-settings-btn:hover { background: #2d3748; border-color: #818cf8; color: #a5b4fc; }
-            .tts-popover { background: #1f2937; border-color: #374151; color: #d1d5db; box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
-            .tts-popover select { background: #111827; border-color: #374151; color: #d1d5db; }
-        }
-        /* ── Voice controls ──────────────────────────────────────────────────── */
-        .mic-btn, .tts-btn, .tts-pause-btn, .tts-stop-btn {
-            padding: 12px 14px;
-            background: #f3f4f6;
-            color: #374151;
-            border: 1.5px solid #e5e7eb;
-            border-radius: 12px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            flex-shrink: 0;
-            line-height: 1;
-        }
-        .mic-btn:hover, .tts-btn:hover,
-        .tts-pause-btn:hover, .tts-stop-btn:hover { background: #ede9fe; border-color: #a5b4fc; }
-        .mic-btn.recording  { background: #fee2e2; border-color: #fca5a5; color: #dc2626; animation: micPulse 1s infinite; }
-        .mic-btn.processing { background: #fef3c7; border-color: #fbbf24; cursor: wait; }
-        .tts-btn.active     { background: #ede9fe; border-color: #a5b4fc; color: #4338ca; }
-        /* TTS processing — pattern tile spinner on the pause button */
-        .tts-pause-btn.processing {
-            position: relative;
-            overflow: hidden;
-            color: transparent !important;
-            border-color: var(--c2, #6366f1);
-            cursor: wait;
-        }
-        .tts-pause-btn.processing::before {
-            content: '';
-            position: absolute;
-            inset: 0;
-            background:
-                linear-gradient(145deg, var(--c1,#3730a3) 10%, var(--c2,#6366f1) 10.5% 19%, transparent 19.5% 80.5%, var(--c2,#6366f1) 81% 89.5%, var(--c3,#4f46e5) 90%),
-                linear-gradient( 35deg, var(--c1,#3730a3) 10%, var(--c2,#6366f1) 10.5% 19%, transparent 19.5% 80.5%, var(--c2,#6366f1) 81% 89.5%, var(--c3,#4f46e5) 90%);
-            background-size: 24px 16px;
-            animation: ttsProcessingSpin 0.6s linear infinite;
-            opacity: 0.85;
-        }
-        .tts-pause-btn.processing::after {
-            content: '⏳';
-            position: absolute;
-            inset: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 0.85rem;
-            color: white;
-        }
-        @keyframes ttsProcessingSpin {
-            from { background-position: 0 0, 0 0; }
-            to   { background-position: 24px 0, 24px 0; }
-        }
-        @keyframes micPulse {
-            0%,100% { box-shadow: 0 0 0 0 rgba(220,38,38,0.4); }
-            50%      { box-shadow: 0 0 0 6px rgba(220,38,38,0); }
-        }
-        /* TTS controls wrapper — single button when off, three when on */
-        .tts-controls { display: flex; gap: 4px; flex-shrink: 0; }
-        .tts-btn { min-width: 52px; }
-        .tts-pause-btn, .tts-stop-btn { display: none; padding: 12px 11px; }
-        .tts-controls.active .tts-btn { min-width: auto; }
-        .tts-controls.active .tts-pause-btn,
-        .tts-controls.active .tts-stop-btn { display: block; }
-        @media (prefers-color-scheme: dark) {
-            .mic-btn, .tts-btn, .tts-pause-btn, .tts-stop-btn { background: #1f2937; color: #d1d5db; border-color: #374151; }
-            .mic-btn:hover, .tts-btn:hover,
-            .tts-pause-btn:hover, .tts-stop-btn:hover { background: #2d3748; border-color: #818cf8; }
-            .mic-btn.recording { background: #7f1d1d; border-color: #f87171; color: #fca5a5; }
-            .tts-btn.active    { background: #2d3748; border-color: #818cf8; color: #a5b4fc; }
-        }
-
-        /* Time-of-day emoji animations */
-        @keyframes moonFloat { 0%,100% { transform: translateY(0); }     50% { transform: translateY(-3px); } }
-        @keyframes sunPulse  { 0%,100% { transform: scale(1); }          50% { transform: scale(1.18); } }
-        @keyframes leafDrift { 0%,100% { transform: rotate(-6deg); }     50% { transform: rotate(6deg); } }
-        @keyframes snowFloat { 0%,100% { transform: translateY(0) rotate(0deg); }  50% { transform: translateY(-3px) rotate(20deg); } }
-        @keyframes flowerBob { 0%,100% { transform: scale(1) rotate(-3deg); }      50% { transform: scale(1.12) rotate(3deg); } }
-        @keyframes glowPulse { 0%,100% { opacity: 0.88; }                50% { opacity: 1; } }
-
-        html[data-timeofday="night"]     .time-emoji { animation: moonFloat 3.5s ease-in-out infinite; }
-        html[data-timeofday="dawn"]      .time-emoji { animation: glowPulse 2s   ease-in-out infinite; }
-        html[data-timeofday="morning"]   .time-emoji { animation: sunPulse  2.5s ease-in-out infinite; }
-        html[data-timeofday="afternoon"] .time-emoji { animation: sunPulse  3s   ease-in-out infinite; }
-        html[data-timeofday="dusk"]      .time-emoji { animation: glowPulse 1.8s ease-in-out infinite; }
-        html[data-timeofday="evening"]   .time-emoji { animation: moonFloat 4s   ease-in-out infinite; }
-
-        html[data-season="spring"] .season-emoji { animation: flowerBob 2.5s ease-in-out infinite; }
-        html[data-season="autumn"] .season-emoji { animation: leafDrift  2s  ease-in-out infinite; }
-        html[data-season="winter"] .season-emoji { animation: snowFloat  3s  ease-in-out infinite; }
-    </style>
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>&#x1F99E; PicoClaw</h1>
-            <div id="themeIndicator">
-                <span class="season-emoji theme-emoji"></span>
-                <span class="time-emoji theme-emoji"></span>
-                <span id="themeLabel"></span>
+            <div class="header-controls">
+                <div id="currentModel" class="model-badge" title="Current AI Model" style="display: none;">
+                    <span>&#x1F916;</span>
+                    <span id="modelName">Loading...</span>
+                </div>
+                <div id="themeIndicator">
+                    <span class="season-emoji theme-emoji"></span>
+                    <span class="time-emoji theme-emoji"></span>
+                    <span id="themeLabel"></span>
+                </div>
             </div>
         </div>
 
@@ -633,7 +40,13 @@
             <div class="sidebar-resize" id="sidebarResize"></div>
 
             <div class="main-area">
-                <div class="chat-title-bar" id="chatTitleBar"></div>
+                <div class="chat-title-bar">
+                    <div class="chat-title-text" id="chatTitleBar"></div>
+                    <div class="title-bar-controls">
+                        <button id="configBtn" class="title-bar-btn" title="Configuration">&#x2699;&#xFE0F; Config</button>
+                        <button id="helpBtn" class="title-bar-btn" title="Help">&#x2753; Help</button>
+                    </div>
+                </div>
                 <div class="messages" id="messages"></div>
                 <div class="input-area">
                     <button id="micBtn" class="mic-btn" disabled title="Voice input (requires Whisper)">&#x1F3A4;</button>
@@ -646,26 +59,71 @@
                     <div style="position:relative;flex-shrink:0;">
                         <button id="ttsSettingsBtn" class="tts-settings-btn" title="TTS settings">&#x2699;&#xFE0F;</button>
                         <div id="ttsPopover" class="tts-popover">
-                            <label for="ttsLangSelect">Language</label>
-                            <select id="ttsLangSelect"></select>
-                            <label for="ttsVoiceSelect">Voice</label>
-                            <select id="ttsVoiceSelect"></select>
-                            <div class="row"><label for="ttsRate">Speed</label><span class="val" id="ttsRateVal">1.0&times;</span></div>
-                            <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1">
-                            <div class="row"><label for="ttsVolume">Volume</label><span class="val" id="ttsVolumeVal">100%</span></div>
-                            <input type="range" id="ttsVolume" min="0" max="1" step="0.05" value="1">
-                            <div class="row"><label for="ttsPitch">Pitch</label><span class="val" id="ttsPitchVal">1.0</span></div>
-                            <input type="range" id="ttsPitch" min="0.5" max="2" step="0.1" value="1">
+                            <label for="ttsEngineSelect">TTS Engine</label>
+                            <select id="ttsEngineSelect">
+                                <option value="browser">Browser (Built-in voices)</option>
+                                <option value="edge-tts">Edge-TTS (Microsoft) &#x2728;</option>
+                                <option value="elevenlabs">ElevenLabs &#x1F4B0;</option>
+                            </select>
+                            <div id="ttsEngineBrowserOptions">
+                                <label for="ttsLangSelect">Language</label>
+                                <select id="ttsLangSelect"></select>
+                                <label for="ttsVoiceSelect">Voice</label>
+                                <select id="ttsVoiceSelect"></select>
+                                <div class="row"><label for="ttsRate">Speed</label><span class="val" id="ttsRateVal">1.0&times;</span></div>
+                                <input type="range" id="ttsRate" min="0.5" max="2" step="0.1" value="1">
+                                <div class="row"><label for="ttsVolume">Volume</label><span class="val" id="ttsVolumeVal">100%</span></div>
+                                <input type="range" id="ttsVolume" min="0" max="1" step="0.05" value="1">
+                                <div class="row"><label for="ttsPitch">Pitch</label><span class="val" id="ttsPitchVal">1.0</span></div>
+                                <input type="range" id="ttsPitch" min="0.5" max="2" step="0.1" value="1">
+                            </div>
+                            <div id="ttsEngineEdgeOptions" style="display:none;">
+                                <label for="edgeTtsVoice">Voice</label>
+                                <select id="edgeTtsVoice">
+                                    <option value="en-US-MichelleNeural">en-US-MichelleNeural (Female)</option>
+                                    <option value="en-US-GuyNeural">en-US-GuyNeural (Male)</option>
+                                    <option value="en-US-AriaNeural">en-US-AriaNeural (Female)</option>
+                                    <option value="en-US-DavisNeural">en-US-DavisNeural (Male)</option>
+                                    <option value="en-GB-SoniaNeural">en-GB-SoniaNeural (British Female)</option>
+                                    <option value="en-GB-RyanNeural">en-GB-RyanNeural (British Male)</option>
+                                </select>
+                                <div class="row"><label for="edgeTtsRate">Speed</label><span class="val" id="edgeTtsRateVal">+0%</span></div>
+                                <input type="range" id="edgeTtsRate" min="-50" max="50" step="5" value="0">
+                                <div style="font-size:0.85em;color:#666;margin-top:8px;">&#x26A0;&#xFE0F; Requires edge-tts skill installed & configured</div>
+                            </div>
+                            <div id="ttsEngineElevenlabsOptions" style="display:none;">
+                                <label for="elevenlabsTtsVoice">Voice ID</label>
+                                <input type="text" id="elevenlabsTtsVoice" placeholder="Enter ElevenLabs voice ID" style="width:100%;padding:4px;border:1px solid #ccc;border-radius:4px;">
+                                <div style="font-size:0.85em;color:#666;margin-top:4px;">Get voice IDs from ElevenLabs dashboard</div>
+                                <div style="font-size:0.85em;color:#e63946;margin-top:8px;">&#x1F4B0; Requires ElevenLabs API key & credits</div>
+                            </div>
                         </div>
                     </div>
                     <button id="sendButton">Send</button>
                 </div>
                 <div class="bottom-bar">
-                    <div class="status-indicator">
+                    <button id="connectBtn" class="connect-btn" title="Check gateway connection">
                         <div class="status-dot" id="statusDot"></div>
                         <span id="statusText">Checking&#x2026;</span>
-                    </div>
+                    </button>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Config Modal -->
+    <div id="configModal" class="config-modal">
+        <div class="config-modal-content">
+            <div class="config-modal-header">
+                <h2>&#x2699;&#xFE0F; Configuration</h2>
+                <button class="theme-toggle" id="matrixToggle" onclick="app.toggleMatrixTheme()" title="Toggle Matrix Theme">MATRIX</button>
+                <button class="config-modal-close" id="configModalClose">&#x2715;</button>
+            </div>
+            <div class="config-tabs" id="configTabs" style="display: none;">
+                <!-- Tabs will be dynamically populated -->
+            </div>
+            <div class="config-modal-body" id="configModalBody">
+                <div class="config-loading" style="padding: 40px; text-align: center; color: #9ca3af;">Loading configuration...</div>
             </div>
         </div>
     </div>
@@ -690,6 +148,8 @@
                 this.store = loadStore() || defaultStore();
                 this.isConnected = false;
                 this.apiUrl = window.location.origin;
+                this.configEditMode = false;
+                this.configRawData = null;
 
                 this.el = {
                     messages:       document.getElementById('messages'),
@@ -697,6 +157,9 @@
                     sendButton:     document.getElementById('sendButton'),
                     statusDot:      document.getElementById('statusDot'),
                     statusText:     document.getElementById('statusText'),
+                    connectBtn:     document.getElementById('connectBtn'),
+                    configBtn:      document.getElementById('configBtn'),
+                    helpBtn:        document.getElementById('helpBtn'),
                     chatList:       document.getElementById('chatList'),
                     newChatBtn:     document.getElementById('newChatBtn'),
                     chatTitleBar:   document.getElementById('chatTitleBar'),
@@ -709,6 +172,14 @@
                     ttsStopBtn:     document.getElementById('ttsStopBtn'),
                     ttsSettingsBtn: document.getElementById('ttsSettingsBtn'),
                     ttsPopover:     document.getElementById('ttsPopover'),
+                    ttsEngineSelect: document.getElementById('ttsEngineSelect'),
+                    ttsEngineBrowserOptions: document.getElementById('ttsEngineBrowserOptions'),
+                    ttsEngineEdgeOptions: document.getElementById('ttsEngineEdgeOptions'),
+                    ttsEngineElevenlabsOptions: document.getElementById('ttsEngineElevenlabsOptions'),
+                    edgeTtsVoice:   document.getElementById('edgeTtsVoice'),
+                    edgeTtsRate:    document.getElementById('edgeTtsRate'),
+                    edgeTtsRateVal: document.getElementById('edgeTtsRateVal'),
+                    elevenlabsTtsVoice: document.getElementById('elevenlabsTtsVoice'),
                     ttsLangSelect:  document.getElementById('ttsLangSelect'),
                     ttsVoiceSelect: document.getElementById('ttsVoiceSelect'),
                     ttsRate:        document.getElementById('ttsRate'),
@@ -717,12 +188,21 @@
                     ttsRateVal:     document.getElementById('ttsRateVal'),
                     ttsVolumeVal:   document.getElementById('ttsVolumeVal'),
                     ttsPitchVal:    document.getElementById('ttsPitchVal'),
+                    configModal:    document.getElementById('configModal'),
+                    configModalBody: document.getElementById('configModalBody'),
+                    configModalClose: document.getElementById('configModalClose'),
+                    configTabs:     document.getElementById('configTabs'),
                 };
+                this.configData = null;
+                this.activeConfigTab = 'overview';
 
                 this.el.sendButton.addEventListener('click',   () => this.sendMessage());
                 this.el.messageInput.addEventListener('keypress', e => {
                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); this.sendMessage(); }
                 });
+                this.el.connectBtn.addEventListener('click', () => this.checkConnection());
+                this.el.configBtn.addEventListener('click', () => this.showConfig());
+                this.el.helpBtn.addEventListener('click', () => this.showHelp());
                 this.el.newChatBtn.addEventListener('click', () => this.newChat());
                 this.el.micBtn.addEventListener('click', () => this.toggleRecording());
                 this.el.ttsBtn.addEventListener('click',       () => this.toggleTts());
@@ -731,16 +211,40 @@
                 this.el.ttsSettingsBtn.addEventListener('click', e => { e.stopPropagation(); this.el.ttsPopover.classList.toggle('open'); });
                 document.addEventListener('click', () => this.el.ttsPopover.classList.remove('open'));
                 this.el.ttsPopover.addEventListener('click', e => e.stopPropagation());
+                this.el.configModalClose.addEventListener('click', () => this.hideConfigModal());
+                this.el.configModal.addEventListener('click', (e) => {
+                    if (e.target === this.el.configModal) this.hideConfigModal();
+                });
 
                 // Load TTS prefs
                 const ttsPrefs = JSON.parse(localStorage.getItem('picoclaw_tts') || '{}');
+                this.ttsEngine    = ttsPrefs.engine || 'browser';
                 this.ttsVoiceName = ttsPrefs.voice  || '';
                 this.ttsLang      = ttsPrefs.lang   || '';
                 this.el.ttsRate.value   = ttsPrefs.rate   ?? 1;
                 this.el.ttsVolume.value = ttsPrefs.volume ?? 1;
                 this.el.ttsPitch.value  = ttsPrefs.pitch  ?? 1;
+                this.el.ttsEngineSelect.value = this.ttsEngine;
+                this.el.edgeTtsVoice.value = ttsPrefs.edgeVoice || 'en-US-MichelleNeural';
+                this.el.edgeTtsRate.value = ttsPrefs.edgeRate || 0;
+                this.el.elevenlabsTtsVoice.value = ttsPrefs.elevenlabsVoice || '';
                 this._updateTtsLabels();
+                this._updateTtsEngineOptions();
+                // Update edge-tts rate label
+                const edgeRate = this.el.edgeTtsRate.value;
+                this.el.edgeTtsRateVal.textContent = (edgeRate > 0 ? '+' : '') + edgeRate + '%';
 
+                this.el.ttsEngineSelect.addEventListener('change', () => { 
+                    this.ttsEngine = this.el.ttsEngineSelect.value;
+                    this._updateTtsEngineOptions();
+                    this._saveTtsPrefs();
+                });
+                this.el.edgeTtsRate.addEventListener('input', () => { 
+                    this.el.edgeTtsRateVal.textContent = (this.el.edgeTtsRate.value > 0 ? '+' : '') + this.el.edgeTtsRate.value + '%';
+                    this._saveTtsPrefs();
+                });
+                this.el.edgeTtsVoice.addEventListener('change', () => { this._saveTtsPrefs(); });
+                this.el.elevenlabsTtsVoice.addEventListener('input', () => { this._saveTtsPrefs(); });
                 this.el.ttsRate.addEventListener('input',   () => { this._updateTtsLabels(); this._saveTtsPrefs(); this._ttsRestartIfPlaying(); });
                 this.el.ttsVolume.addEventListener('input', () => { this._updateTtsLabels(); this._saveTtsPrefs(); this._ttsRestartIfPlaying(); });
                 this.el.ttsPitch.addEventListener('input',  () => { this._updateTtsLabels(); this._saveTtsPrefs(); this._ttsRestartIfPlaying(); });
@@ -762,7 +266,11 @@
                 // Populate voice list (voices load async in most browsers)
                 const fillVoices = () => {
                     const voices = speechSynthesis.getVoices();
-                    if (!voices.length) return;
+                    console.log('TTS voices loaded:', voices.length);
+                    if (!voices.length) {
+                        console.warn('No TTS voices available yet, waiting for voiceschanged event...');
+                        return;
+                    }
 
                     // Group by base language code (e.g. 'en' from 'en-US', 'en-GB')
                     // so all English voices appear under one "English" entry.
@@ -774,6 +282,7 @@
                         }
                     });
                     const langs = [...langMap.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+                    console.log('Available languages:', langs.length);
 
                     const savedBase = this.ttsLang || 'en';
                     this.el.ttsLangSelect.innerHTML =
@@ -784,9 +293,22 @@
 
                     this._allVoices = voices;
                     this._fillVoicesByLang();
+                    console.log('TTS initialization complete. Engine:', this.ttsEngine);
                 };
-                speechSynthesis.addEventListener('voiceschanged', fillVoices);
+                
+                // Try filling immediately (works in Firefox)
                 fillVoices();
+                
+                // Also listen for voiceschanged event (required for Chrome/Edge)
+                speechSynthesis.addEventListener('voiceschanged', fillVoices);
+                
+                // Fallback: retry after a short delay if still no voices
+                setTimeout(() => {
+                    if (!this._allVoices || this._allVoices.length === 0) {
+                        console.log('Retrying voice initialization...');
+                        fillVoices();
+                    }
+                }, 500);
 
                 this.ttsEnabled     = false;
                 this.ttsSelectedEl  = null;
@@ -801,6 +323,12 @@
                 this.renderSidebar();
                 this.renderMessages();
                 this.checkConnection();
+                
+                // Load current model display on startup
+                this.updateCurrentModel();
+                
+                // Check connection every 5 seconds
+                setInterval(() => this.checkConnection(), 5000);
             }
 
             //  Sidebar drag resize 
@@ -983,6 +511,1487 @@
                 this.el.statusDot.className = 'status-dot ' + cls;
                 this.el.statusText.textContent = text;
             }
+            
+            async updateCurrentModel() {
+                try {
+                    const response = await fetch('/api/config?raw=true');
+                    if (response.ok) {
+                        const data = await response.json();
+                        const modelName = data.config?.agents?.defaults?.model_name;
+                        
+                        if (modelName) {
+                            const modelBadge = document.getElementById('currentModel');
+                            const modelNameEl = document.getElementById('modelName');
+                            
+                            if (modelBadge && modelNameEl) {
+                                modelNameEl.textContent = modelName;
+                                modelBadge.style.display = 'flex';
+                                modelBadge.title = `Current AI Model: ${modelName}`;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to get current model:', error);
+                }
+            }
+            
+            async restartGateway() {
+                try {
+                    // For Electron app, we need to check if we're in that environment
+                    // For now, just inform the user
+                    const isElectron = window.process && window.process.type;
+                    
+                    if (isElectron) {
+                        alert('&#x26A0;&#xFE0F; Please restart the Electron app for changes to take effect.\\n\\nClose the app and run "npm run electron" again.');
+                    } else {
+                        alert('&#x26A0;&#xFE0F; Please restart the PicoClaw gateway manually:\\n\\n1. Stop the gateway (Ctrl+C in terminal)\\n2. Restart: .\\\\build\\\\picoclaw.exe gateway\\n\\nOr restart the web interface if using api-server.js');
+                    }
+                } catch (error) {
+                    console.error('Gateway restart error:', error);
+                    alert('&#x26A0;&#xFE0F; Failed to restart gateway: ' + error.message);
+                }
+            }
+
+            async showConfig() {
+                this.el.configModal.classList.add('show');
+                this.el.configModalBody.innerHTML = '<div class="config-loading" style="padding: 40px; text-align: center; color: #9ca3af;">Loading configuration...</div>';
+                this.el.configTabs.classList.remove('loaded');
+                this.el.configTabs.style.display = 'none';
+                this.configEditMode = false;
+                
+                // Restore Matrix theme preference
+                const savedTheme = localStorage.getItem('picoclaw-config-theme');
+                const modalContent = document.querySelector('.config-modal-content');
+                const toggleBtn = document.getElementById('matrixToggle');
+                if (savedTheme === 'matrix') {
+                    modalContent.classList.add('matrix-theme');
+                    toggleBtn.textContent = 'NORMAL';
+                } else {
+                    modalContent.classList.remove('matrix-theme');
+                    toggleBtn.textContent = 'MATRIX';
+                }
+                
+                try {
+                    // Fetch masked config for display
+                    const response = await fetch('/api/config');
+                    const data = await response.json();
+                    
+                    if (!response.ok) {
+                        this.el.configModalBody.innerHTML = `
+                            <div class="config-tabcontent active" style="display: block;">
+                                <div class="config-error">
+                                    <strong>&#x26A0;&#xFE0F; ${data.error}</strong>
+                                    <p>${data.suggestion || data.message || ''}</p>
+                                    ${data.path ? `<p><strong>Expected path:</strong> ${data.path}</p>` : ''}
+                                </div>
+                            </div>
+                        `;
+                        return;
+                    }
+                    
+                    // Fetch raw config for editing
+                    const rawResponse = await fetch('/api/config?raw=true');
+                    const rawData = await rawResponse.json();
+                    
+                    this.configData = data;
+                    this.configRawData = rawData;
+                    this.renderConfigTabs();
+                    this.renderAllTabContent();
+                } catch (error) {
+                    this.el.configModalBody.innerHTML = `
+                        <div class="config-tabcontent active" style="display: block;">
+                            <div class="config-error">
+                                <strong>&#x26A0;&#xFE0F; Failed to load configuration</strong>
+                                <p>${error.message}</p>
+                                <p>Make sure the PicoClaw web interface server is running.</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+            
+            renderConfigTabs() {
+                const config = this.configData.config;
+                const tabs = [
+                    { id: 'overview', label: '&#x1F4CB; Overview', icon: '&#x1F4CB;' },
+                    { id: 'agents', label: '&#x1F916; Agents', icon: '&#x1F916;' },
+                    { id: 'model_list', label: '&#x1F9E0; Models', icon: '&#x1F9E0;' },
+                    { id: 'channels', label: '&#x1F4AC; Channels', icon: '&#x1F4AC;' },
+                    { id: 'gateway', label: '&#x1F310; Gateway', icon: '&#x1F310;' },
+                    { id: 'session', label: '&#x1F511; Session', icon: '&#x1F511;' },
+                    { id: 'providers', label: '&#x1F50C; Providers', icon: '&#x1F50C;' },
+                    { id: 'skills', label: '&#x1F3AF; Skills', icon: '&#x1F3AF;' },
+                    { id: 'tools', label: '&#x1F527; Tools', icon: '&#x1F527;' },
+                    { id: 'cron', label: '&#x23F0; CRON (Scheduled)', icon: '&#x23F0;' },
+                    { id: 'voice', label: '&#x1F3A4; Voice', icon: '&#x1F3A4;' },
+                    { id: 'logging', label: '&#x1F4DD; Logging', icon: '&#x1F4DD;' },
+                ];
+                
+                // Filter tabs to only show sections that exist in config
+                const availableTabs = tabs.filter(tab => {
+                    if (tab.id === 'overview') return true;
+                    return config[tab.id] !== undefined;
+                });
+                
+                if (availableTabs.length === 0) {
+                    console.error('No tabs available to render');
+                    return;
+                }
+                
+                console.log('Rendering', availableTabs.length, 'config tabs:', availableTabs.map(t => t.id).join(', '));
+                
+                this.el.configTabs.innerHTML = availableTabs.map(tab => 
+                    `<button class="config-tab ${tab.id === this.activeConfigTab ? 'active' : ''}" 
+                             data-tab-id="${tab.id}"
+                             onclick="app.switchConfigTab('${tab.id}')">
+                        ${tab.label}
+                    </button>`
+                ).join('');
+                
+                this.el.configTabs.classList.add('loaded');
+                this.el.configTabs.style.display = 'flex';
+            }
+            
+            switchConfigTab(tabId) {
+                this.activeConfigTab = tabId;
+                // Hide all tab content
+                this.el.configModalBody.querySelectorAll('.config-tabcontent').forEach(content => {
+                    content.classList.remove('active');
+                });
+                // Show selected tab content
+                const targetContent = document.getElementById('config-tab-' + tabId);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
+                // Update tab buttons
+                this.el.configTabs.querySelectorAll('.config-tab').forEach(btn => {
+                    btn.classList.toggle('active', btn.getAttribute('data-tab-id') === tabId);
+                });
+                // Re-adjust tooltip positions for new tab
+                setTimeout(() => this.adjustTooltipPositions(), 50);
+            }
+            
+            adjustTooltipPositions() {
+                // Smart tooltip positioning based on location in modal
+                const tooltips = document.querySelectorAll('.config-tooltip');
+                const modal = document.querySelector('.config-modal-content');
+                if (!modal) return;
+                
+                const modalRect = modal.getBoundingClientRect();
+                const modalCenter = modalRect.left + modalRect.width / 2;
+                
+                tooltips.forEach(tooltip => {
+                    const tooltipRect = tooltip.getBoundingClientRect();
+                    const tooltipCenter = tooltipRect.left + tooltipRect.width / 2;
+                    
+                    // Remove existing classes
+                    tooltip.classList.remove('tooltip-left', 'tooltip-right');
+                    
+                    // Add class based on position
+                    if (tooltipCenter < modalCenter) {
+                        tooltip.classList.add('tooltip-left');
+                    } else {
+                        tooltip.classList.add('tooltip-right');
+                    }
+                });
+            }
+
+            renderAllTabContent() {
+                const data = this.configData;
+                const config = data.config;
+                const lastModified = new Date(data.lastModified).toLocaleString();
+                
+                const tabs = [
+                    { id: 'overview', label: '&#x1F4CB; Overview' },
+                    { id: 'agents', label: '&#x1F916; Agents' },
+                    { id: 'model_list', label: '&#x1F9E0; Models' },
+                    { id: 'channels', label: '&#x1F4AC; Channels' },
+                    { id: 'gateway', label: '&#x1F310; Gateway' },
+                    { id: 'session', label: '&#x1F511; Session' },
+                    { id: 'providers', label: '&#x1F50C; Providers' },
+                    { id: 'skills', label: '&#x1F3AF; Skills' },
+                    { id: 'tools', label: '&#x1F527; Tools' },
+                    { id: 'cron', label: '&#x23F0; CRON (Scheduled)' },
+                    { id: 'voice', label: '&#x1F3A4; Voice' },
+                    { id: 'logging', label: '&#x1F4DD; Logging' },
+                ];
+                
+                // Create content for all available tabs
+                const tabContents = [];
+                
+                tabs.forEach(tab => {
+                    if (tab.id === 'overview' || config[tab.id] !== undefined) {
+                        const isActive = tab.id === this.activeConfigTab;
+                        let content = '';
+                        
+                        if (tab.id === 'overview') {
+                            if (this.configEditMode) {
+                                content = `
+                                    <div class="config-info">
+                                        <strong>&#x270F;&#xFE0F; Edit Configuration</strong>
+                                        <p>Editing the raw JSON configuration. Make sure the JSON is valid before saving.</p>
+                                    </div>
+                                    <textarea id="config-edit-textarea" class="config-edit-textarea">${JSON.stringify(this.configRawData.config, null, 4)}</textarea>
+                                    <div class="config-edit-actions">
+                                        <button class="config-btn config-btn-success" onclick="app.saveOverview()">&#x1F4BE; Save Configuration</button>
+                                        <button class="config-btn config-btn-secondary" onclick="app.cancelEditOverview()">&#x274C; Cancel</button>
+                                    </div>
+                                `;
+                            } else {
+                                content = `
+                                    <div class="config-info">
+                                        <strong>&#x1F4C1; Config File Location:</strong>
+                                        <code>${data.path}</code><br>
+                                        <strong>&#x1F55C; Last Modified:</strong> ${lastModified}
+                                    </div>
+                                    <div class="config-edit-actions">
+                                        <button class="config-btn config-btn-primary" onclick="app.editOverview()">&#x1F4DD; Edit Raw JSON</button>
+                                    </div>
+                                    <div class="config-info">
+                                        <strong>&#x1F680; Quick Start:</strong><br>
+                                        &#x2022; Configure <strong>Agents</strong> settings for default behavior<br>
+                                        &#x2022; Add AI models in <strong>Models</strong> tab with API keys<br>
+                                        &#x2022; Enable and configure <strong>Channels</strong> for messaging platforms<br>
+                                        &#x2022; Adjust <strong>Gateway</strong> settings for API server<br>
+                                        <br>
+                                        <strong>&#x1F4CB; Configuration Sections:</strong><br>
+                                        ${Object.keys(config).map(key => `&#x2022; ${key}`).join('<br>')}
+                                    </div>
+                                    <div class="config-json">${JSON.stringify(config, null, 2)}</div>
+                                `;
+                            }
+                        } else {
+                            const sectionData = config[tab.id];
+                            if (sectionData === undefined) {
+                                content = `
+                                    <div class="config-info">
+                                        <strong>&#x26A0;&#xFE0F; Section Not Configured</strong>
+                                        <p>The "${tab.id}" section is not present in your configuration file.</p>
+                                    </div>
+                                `;
+                            } else {
+                                // Generate form for this section
+                                content = this.renderConfigForm(tab.id, sectionData);
+                            }
+                        }
+                        
+                        tabContents.push(`
+                            <div id="config-tab-${tab.id}" class="config-tabcontent ${isActive ? 'active' : ''}">
+                                ${content}
+                            </div>
+                        `);
+                    }
+                });
+                
+                this.el.configModalBody.innerHTML = tabContents.join('');
+                
+                // Adjust tooltip positions after rendering
+                setTimeout(() => {
+                    this.adjustTooltipPositions();
+                }, 100);
+                
+                // Trigger initial model config display for agents tab
+                setTimeout(() => {
+                    const trigger = document.getElementById('model-trigger');
+                    if (trigger) {
+                        const modelName = trigger.getAttribute('data-model');
+                        if (modelName) {
+                            this.showSelectedModelConfig(modelName);
+                        }
+                    }
+                }, 50);
+            }
+            
+            getConfigSchema() {
+                return {
+                    agents: {
+                        defaults: {
+                            workspace: { type: 'string', label: 'Workspace Path', description: 'Default workspace directory for agent operations. Path where agent can read/write files. Defaults to ~/.picoclaw/workspace. Use absolute paths or ~ for home directory.' },
+                            restrict_to_workspace: { type: 'boolean', label: 'Restrict to Workspace', description: 'Security setting: When enabled, limits all file operations to workspace directory only. Highly recommended for production. Disable only for trusted environments.' },
+                            model_name: { type: 'string', label: 'Default Model', description: 'Default AI model name to use. Must match a model_name from model_list section. Examples: gpt4, claude-sonnet-4.6, deepseek. &#x26A0;&#xFE0F; Model must have valid API key or OAuth configured.' },
+                            max_tokens: { type: 'number', label: 'Max Tokens', description: 'Maximum tokens per AI response. Higher values allow longer responses but cost more. Typical: 4096-8192. Advanced: up to 128000 for long contexts. Affects API costs.', min: 256, max: 128000, step: 256 },
+                            temperature: { type: 'number', label: 'Temperature', description: 'Controls response randomness. 0 = fully deterministic, consistent answers. 0.7 = balanced creativity. 1.0+ = very creative, varied. Use 0 for code/factual tasks, 0.7-1.0 for creative writing.', min: 0, max: 2, step: 0.1 },
+                            max_tool_iterations: { type: 'number', label: 'Max Tool Iterations', description: 'Maximum number of tool calls allowed per message. Prevents infinite loops. Higher values allow complex multi-step tasks but increase costs. Recommended: 20. Minimum: 5 for basic tasks.', min: 1, max: 100, step: 1 },
+                            summarize_message_threshold: { type: 'number', label: 'Summarize Threshold', description: 'Number of messages in conversation before auto-summarization triggers. Helps manage context window and reduce token usage. Lower = more frequent summarization.', min: 5, max: 100, step: 5 },
+                            summarize_token_percent: { type: 'number', label: 'Summarize Token %', description: 'Percentage of max_tokens that triggers auto-summarization. At 75%, if context reaches 75% of max_tokens, conversation is summarized. Prevents context overflow.', min: 10, max: 100, step: 5 }
+                        }
+                    },
+                    gateway: {
+                        host: { type: 'string', label: 'Host', description: 'Gateway server bind address. Use 127.0.0.1 (localhost only) or 0.0.0.0 (all interfaces). &#x1F433; Docker users: Must use 0.0.0.0 to access from host.' },
+                        port: { type: 'number', label: 'Port', description: 'Gateway server port. Default: 18795. Change if port is already in use. Remember to update web interface and channel configs.', min: 1024, max: 65535, step: 1 },
+                        cors_origins: { type: 'array', label: 'CORS (Cross-Origin) Origins', description: 'Allowed CORS origins for web interface. Use ["*"] for all origins (dev only), or specific URLs like ["http://localhost:3000"]. Security: Restrict in production.' }
+                    },
+                    session: {
+                        dm_scope: { type: 'string', label: 'DM (Direct Message) Scope', description: 'Session tracking strategy. "per-channel-peer" = separate session per platform+user (Discord ID ? Telegram ID). "per-peer" = shared across platforms (same user). "global" = one session for everyone (testing only).' }
+                    },
+                    voice: {
+                        stt_engine: { 
+                            type: 'select', 
+                            label: 'STT (Speech-to-Text) Engine', 
+                            description: 'Speech-to-text engine type. Options: "cli" (local whisper/vosk), "api" (cloud service), "elevenlabs-transcribe" (realtime mic), "elevenlabs-stt" (audio files). CLI requires stt_executable path.',
+                            options: [
+                                { value: 'cli', label: 'CLI (Local executable like whisper/vosk)' },
+                                { value: 'api', label: 'API (Cloud service)' },
+                                { value: 'elevenlabs-transcribe', label: 'ElevenLabs Transcribe (Realtime mic dictation - Low CPU) &#x1F4B0;' },
+                                { value: 'elevenlabs-stt', label: 'ElevenLabs STT (Audio file transcription) &#x1F4B0;' }
+                            ]
+                        },
+                        stt_executable: { type: 'string', label: 'STT Executable Path', description: 'Path to local STT executable (e.g., whisper, vosk). Only used when stt_engine="cli". Must be in PATH or use absolute path. Example: /usr/local/bin/whisper' },
+                        stt_language: { type: 'string', label: 'STT Language Code', description: 'Language code for speech recognition (e.g., "en", "es", "zh"). Improves accuracy by hinting the expected language. Used by ElevenLabs and other engines.' },
+                        stt_realtime_mode: { type: 'boolean', label: 'STT Realtime Mode (Mic)', description: 'Enable realtime microphone dictation mode for ElevenLabs Transcribe. When enabled, transcribes from mic in real-time. When disabled, processes audio files. Requires ffmpeg and python3.' },
+                        stt_show_partials: { type: 'boolean', label: 'STT Show Partial Results', description: 'Show interim transcription text while speaking (ElevenLabs Transcribe only). Provides immediate feedback during realtime dictation.' },
+                        elevenlabs_api_key: { type: 'password', label: 'ElevenLabs API Key &#x1F4B0;', description: '&#x26A0;&#xFE0F; PAID SERVICE: ElevenLabs API key for STT/TTS services. Get from https://elevenlabs.io - Required for elevenlabs-transcribe and elevenlabs-stt. Monitor usage to control costs!' },
+                        tts_engine: { 
+                            type: 'select', 
+                            label: 'TTS (Text-to-Speech) Engine', 
+                            description: 'Text-to-speech engine. Options: espeak (free), festival (free), edge-tts (Microsoft online voices, low CPU), google (cloud), azure (cloud), elevenlabs (premium quality).',
+                            options: [
+                                { value: 'espeak', label: 'eSpeak (Free, local, robotic voice)' },
+                                { value: 'festival', label: 'Festival (Free, local)' },
+                                { value: 'edge-tts', label: 'Edge TTS (Microsoft online voices - Low CPU, Free) &#x2728;' },
+                                { value: 'google', label: 'Google Cloud TTS &#x2601;&#xFE0F;' },
+                                { value: 'azure', label: 'Azure Cognitive Services TTS &#x2601;&#xFE0F;' },
+                                { value: 'elevenlabs', label: 'ElevenLabs TTS (Premium quality) &#x1F4B0;' }
+                            ]
+                        },
+                        tts_voice: { type: 'string', label: 'TTS Voice ID', description: 'Voice identifier for TTS engine. edge-tts: "en-US-MichelleNeural", "en-US-GuyNeural". Google: "en-US-Neural2-A". ElevenLabs: voice ID from dashboard. Use skill scripts to list available voices.' },
+                        tts_rate: { type: 'string', label: 'TTS Speech Rate', description: 'Speech rate adjustment for TTS. Format depends on engine. edge-tts: "+10%" (faster), "-15%" (slower). Leave empty for default rate.' },
+                        skill_edge_tts_path: { type: 'string', label: 'Edge-TTS Skill Path', description: 'Path to edge-tts skill scripts directory. Default: ~/.picoclaw/workspace/skills/edge-tts/scripts. Used when tts_engine is "edge-tts". Requires Node.js + npm.' },
+                        skill_elevenlabs_transcribe_path: { type: 'string', label: 'ElevenLabs Transcribe Skill Path', description: 'Path to elevenlabs-transcribe skill scripts directory. Default: ~/.picoclaw/workspace/skills/elevenlabs-transcribe/scripts. Used for realtime mic dictation. Requires ffmpeg + python3.' },
+                        skill_elevenlabs_stt_path: { type: 'string', label: 'ElevenLabs STT Skill Path', description: 'Path to elevenlabs-stt skill scripts directory. Default: ~/.picoclaw/workspace/skills/elevenlabs-stt/scripts. Used for audio file transcription. Requires python3.' }
+                    },
+                    logging: {
+                        level: { type: 'string', label: 'Log Level', description: 'Log verbosity: "debug" (everything), "info" (general), "warn" (warnings only), "error" (errors only). Use debug for troubleshooting, info for production.' },
+                        file: { type: 'string', label: 'Log File', description: 'Path to log file. Leave empty for console-only logging. Use absolute path or ~/.picoclaw/logs/gateway.log. File rotates at max_size.' },
+                        max_size: { type: 'number', label: 'Max Size (MB)', description: 'Maximum log file size in MB before rotation. When reached, old logs are archived and new file starts. Typical: 10-100 MB.', min: 1, max: 1000, step: 1 }
+                    },
+                    providers: {
+                        _common: {
+                            api_key: { type: 'password', label: 'API (Application Interface) Key', description: '&#x26A0;&#xFE0F; DEPRECATED: Use model_list instead. API key for authentication with this provider. Get keys from provider dashboards (OpenRouter, OpenAI, Anthropic, etc.).' },
+                            base_url: { type: 'string', label: 'Base URL', description: '&#x26A0;&#xFE0F; DEPRECATED: Use model_list instead. API base URL. Leave empty for default. Custom: for proxies or self-hosted endpoints.' },
+                            api_base: { type: 'string', label: 'API Base', description: '&#x26A0;&#xFE0F; DEPRECATED: Use model_list instead. API base URL endpoint (alternative to base_url).' },
+                            proxy: { type: 'string', label: 'Proxy', description: 'HTTP/HTTPS proxy URL (format: http://user:pass@host:port). Optional. Use for network restrictions or privacy.' },
+                            timeout: { type: 'number', label: 'Timeout (s)', description: 'API request timeout in seconds. Higher for slow connections or long responses. Typical: 30-60s. Max: 300s.', min: 1, max: 300, step: 1 },
+                            max_retries: { type: 'number', label: 'Max Retries', description: 'Retry attempts for failed requests. 0 = no retries. 3-5 recommended for production. Helps with transient failures.', min: 0, max: 10, step: 1 }
+                        }
+                    },
+                    tools: {
+                        _common: {
+                            enabled: { type: 'boolean', label: 'Enabled', description: 'Enable/disable this tool. When disabled, tool is unavailable to agents.' },
+                            api_key: { type: 'password', label: 'API (Application Interface) Key', description: 'API key for tools requiring authentication (Brave, Perplexity, Tavily, etc.). Get from provider dashboard.' },
+                            max_results: { type: 'number', label: 'Max Results', description: 'Maximum search results to return. Higher = more context but slower/costlier. Typical: 5-10. Used by web search tools.', min: 1, max: 50, step: 1 },
+                            path: { type: 'string', label: 'Path', description: 'Path to tool executable or script. Absolute path or command in PATH. MCP: use "npx" for npm packages.' },
+                            timeout: { type: 'number', label: 'Timeout (s)', description: 'Tool execution timeout. Prevents hanging. Web fetch: 30s. Command exec: 300s. Cron: exec_timeout_minutes.', min: 1, max: 300, step: 1 },
+                            env: { type: 'string', label: 'Environment Variables', description: 'Environment variables for tool (JSON object format: {"VAR":"value"}). MCP stdio: pass API keys securely.' },
+                            base_url: { type: 'string', label: 'Base URL', description: 'API base URL for web tools (SearXNG, GLM Search). Custom instances: http://localhost:8888.' },
+                            enable_deny_patterns: { type: 'boolean', label: 'Enable Deny Patterns', description: 'Exec tool: Enable default dangerous command blocking (rm -rf, format, shutdown, etc.). &#x26A0;&#xFE0F; Disable only in trusted environments!' },
+                            custom_deny_patterns: { type: 'array', label: 'Custom Deny Patterns', description: 'Exec tool: Additional regex patterns to block. Example: ["\\\\brm\\\\s+-r\\\\b", "\\\\bkillall\\\\s+python"]. Enhances security.' },
+                            exec_timeout_minutes: { type: 'number', label: 'Exec Timeout (min)', description: 'Cron tool: Execution timeout in minutes. 0 = unlimited. Prevents runaway jobs. Typical: 5-15 min.', min: 0, max: 1440, step: 1 },
+                            command: { type: 'string', label: 'Command', description: 'MCP stdio: Command to execute (npx, node, python, etc.). Use full path if not in PATH.' },
+                            args: { type: 'array', label: 'Arguments', description: 'MCP stdio: Command arguments array. Example: ["-y", "@modelcontextprotocol/server-filesystem", "/tmp"].' },
+                            type: { type: 'string', label: 'Transport Type', description: 'MCP: Transport type: "stdio" (local process), "sse" (Server-Sent Events), "http" (REST API). Auto-detected if omitted.' },
+                            url: { type: 'string', label: 'URL', description: 'MCP sse/http: Endpoint URL (e.g., https://mcp.example.com/mcp). For remote MCP servers.' },
+                            headers: { type: 'string', label: 'HTTP (HyperText Transfer Protocol) Headers', description: 'MCP sse/http: HTTP headers JSON ({"Authorization":"Bearer TOKEN"}). For authenticated MCP servers.' },
+                            env_file: { type: 'string', label: 'Env File', description: 'MCP stdio: Path to .env file for environment variables. Alternative to env field. More secure for keys.' }
+                        }
+                    },
+                    skills: {
+                        _common: {
+                            enabled: { type: 'boolean', label: 'Enabled', description: 'Enable/disable this skill. Skills provide specialized capabilities via ClawHub registry or local definitions.' },
+                            priority: { type: 'number', label: 'Priority', description: 'Execution priority. Higher values run first. Range: 0-100. Use for skill dependencies (e.g., auth=90, core=50, extras=10).', min: 0, max: 100, step: 1 }
+                        }
+                    },
+                    cron: {
+                        jobs: {
+                            name: { type: 'string', label: 'Job Name', description: 'Friendly identifier for this cron job. Used in logs and monitoring. Example: "daily-backup", "hourly-ping".' },
+                            schedule: { type: 'string', label: 'Schedule', description: 'Cron expression (minute hour day month weekday). Examples: "0 */6 * * *" (every 6hrs), "0 2 * * 0" (Sundays 2am), "*/15 * * * *" (every 15min).' },
+                            enabled: { type: 'boolean', label: 'Enabled', description: 'Enable/disable this cron job without deleting it. Useful for temporary disabling.' },
+                            command: { type: 'string', label: 'Command', description: 'Shell command to execute. &#x26A0;&#xFE0F; Respects exec tool deny patterns if enable_deny_patterns=true. Use absolute paths.' }
+                        }
+                    },
+                    channels: {
+                        _common: {
+                            enabled: { type: 'boolean', label: 'Enabled', description: 'Enable/disable this channel. When disabled, bot will not connect to this platform.' },
+                            host: { type: 'string', label: 'Host', description: 'Server bind address for webhook channels. Use 0.0.0.0 for external access, 127.0.0.1 for local only.' },
+                            port: { type: 'number', label: 'Port', description: 'Port for webhook server. Each channel needs unique port. Common: 18790+ range. Remember firewall rules.', min: 1024, max: 65535, step: 1 },
+                            token: { type: 'password', label: 'Bot Token', description: 'Bot authentication token. Get from platform: Telegram (@BotFather), Discord (Developer Portal), etc. Keep secret!' },
+                            app_id: { type: 'string', label: 'App ID', description: 'Application/Client ID from platform developer dashboard. Used for OAuth and app authentication.' },
+                            app_secret: { type: 'password', label: 'App Secret', description: 'Application secret key. Paired with app_id for authentication. Never expose publicly.' },
+                            bot_token: { type: 'password', label: 'Bot Token', description: 'Slack: Bot User OAuth (Open Authorization) Token (xoxb-...) from App Dashboard > OAuth & Permissions.' },
+                            app_token: { type: 'password', label: 'App Token', description: 'Slack: App-Level Token (xapp-...) required for Socket Mode. Create in App Dashboard > Basic Information.' },
+                            client_id: { type: 'string', label: 'Client ID', description: 'OAuth (Open Authorization) 2.0 client identifier. Used in authorization flows. Get from platform developer console.' },
+                            client_secret: { type: 'password', label: 'Client Secret', description: 'OAuth (Open Authorization) 2.0 client secret. Paired with client_id for token exchange. Keep confidential.' },
+                            webhook_url: { type: 'string', label: 'Webhook URL', description: 'External webhook URL for sending messages. Format: https://api.example.com/webhook/send?key=... Include all query params.' },
+                            webhook_path: { type: 'string', label: 'Webhook Path', description: 'Local webhook endpoint path (e.g., /webhook/telegram). Full URL: http://host:port{webhook_path}. Configure in platform dashboard.' },
+                            channel_secret: { type: 'password', label: 'Channel Secret', description: 'LINE: Channel secret from LINE Developers Console. Used to verify webhook signatures.' },
+                            channel_access_token: { type: 'password', label: 'Channel Access Token', description: 'LINE: Long-lived access token from LINE Developers Console. Required for sending messages.' },
+                            allow_from: { type: 'array', label: 'Allow From', description: 'User ID whitelist. Empty = allow all users. Security: List specific IDs to restrict access. Get IDs from logs after first contact.' },
+                            reasoning_channel_id: { type: 'string', label: 'Reasoning Channel ID', description: 'Optional: Channel/DM ID for sending extended thinking output. Useful for debugging or transparency. Leave empty to skip.' },
+                            mention_only: { type: 'boolean', label: 'Mention Only', description: 'Group chats: Only respond when bot is @mentioned. False = respond to all messages. Recommended: true for busy groups.' },
+                            bridge_url: { type: 'string', label: 'Bridge URL', description: 'WhatsApp: WebSocket URL to whatsapp-web.js bridge (ws://localhost:3001). Start bridge separately.' },
+                            use_native: { type: 'boolean', label: 'Use Native', description: 'WhatsApp: Use native client instead of bridge. Experimental. Bridge (false) is more stable.' },
+                            base_url: { type: 'string', label: 'Base URL', description: 'Custom API base URL. Override default platform API endpoint. Use for proxies or regional endpoints.' },
+                            proxy: { type: 'string', label: 'Proxy', description: 'HTTP/HTTPS proxy for channel connections. Format: http://host:port. Useful in restrictive networks.' },
+                            encrypt_key: { type: 'password', label: 'Encryption Key', description: 'Feishu: Message encryption key (43 chars). From Feishu App Dashboard > Event Subscriptions.' },
+                            verification_token: { type: 'password', label: 'Verification Token', description: 'Feishu: Webhook verification token. Used to verify incoming requests authenticity.' },
+                            encoding_aes_key: { type: 'password', label: 'AES (Advanced Encryption Standard) Key', description: 'WeCom: 43-character AES key for message encryption/decryption. From Enterprise WeChat backend.' },
+                            corp_id: { type: 'string', label: 'Corp ID', description: 'WeCom App: Enterprise ID from WeCom Admin Console. Required for self-built applications.' },
+                            corp_secret: { type: 'password', label: 'Corp Secret', description: 'WeCom App: Application secret. Get from application details in WeCom management backend.' },
+                            agent_id: { type: 'number', label: 'Agent ID', description: 'WeCom App: Application agent ID (numeric). Find in application settings. Example: 1000002.', min: 1, max: 9999999, step: 1 },
+                            ws_url: { type: 'string', label: 'WebSocket URL', description: 'OneBot: WebSocket connection URL (ws://127.0.0.1:3001). Requires go-cqhttp or similar OneBot implementation.' },
+                            access_token: { type: 'password', label: 'Access Token', description: 'OneBot: Optional access token for securing WebSocket connection. Configure same token in OneBot server.' },
+                            reconnect_interval: { type: 'number', label: 'Reconnect Interval (s)', description: 'OneBot: Seconds between reconnection attempts after disconnect. Typical: 5-10s. 0 = no auto-reconnect.', min: 0, max: 300, step: 1 },
+                            group_trigger_prefix: { type: 'array', label: 'Group Trigger Prefix', description: 'OneBot: Message prefixes that trigger bot in groups. Example: ["!", "/", "@bot"]. Empty = all messages (if not mention_only).' },
+                            reply_timeout: { type: 'number', label: 'Reply Timeout (s)', description: 'WeCom: Max seconds to wait before reply timeout. Passive message mode only. Typical: 5-10s.', min: 1, max: 30, step: 1 },
+                            max_steps: { type: 'number', label: 'Max Steps', description: 'WeCom AI Bot: Maximum interaction steps/turns per conversation. Prevents infinite loops. Typical: 10-20.', min: 1, max: 100, step: 1 },
+                            welcome_message: { type: 'string', label: 'Welcome Message', description: 'WeCom AI Bot: Initial greeting when user starts conversation. Example: "Hello! How can I help you today?"' }
+                        }
+                    },
+                    model_list: {
+                        model_name: { type: 'string', label: 'Model Name', description: 'Unique friendly identifier for this model configuration. Use this in agents.defaults.model_name. Examples: "gpt4", "claude", "deepseek-local".' },
+                        model: { type: 'string', label: 'Model', description: 'Provider/model identifier. Format: provider/model. Examples: openai/gpt-5.2, anthropic/claude-sonnet-4.6, deepseek/deepseek-chat. See provider docs.' },
+                        api_key: { type: 'password', label: 'API (Application Interface) Key', description: 'API key for authentication. Leave blank for OAuth providers (antigravity). Get from: OpenRouter, OpenAI, Anthropic, Deepseek dashboards. &#x26A0;&#xFE0F; Required for most models!' },
+                        api_base: { type: 'string', label: 'API Base URL', description: 'Custom API endpoint. Leave empty for defaults. Use for: proxies, load balancers, self-hosted models (Ollama: http://localhost:11434/v1).' },
+                        auth_method: { type: 'string', label: 'Auth Method', description: 'Authentication method. "api_key" (default, uses api_key) or "oauth" (Open Authorization, browser-based, for Google/Gemini). &#x26A0;&#xFE0F; OAuth models require separate auth setup.' },
+                        thinking_level: { type: 'string', label: 'Thinking Level', description: 'Extended reasoning level for o1/Claude/Gemini Thinking models. Options: "high" (deep), "medium" (balanced), "low" (quick). &#x1F4B0; High = more tokens/cost!' },
+                        max_tokens_field: { type: 'string', label: 'Max Tokens Field', description: 'API field name for token limit. Usually auto-detected. Override if needed: "max_tokens" (OpenAI), "max_completion_tokens" (some providers).' }
+                    }
+                };
+            }
+
+            getToolMetadata(toolName) {
+                const toolInfo = {
+                    'cron': {
+                        fullName: 'CRON (Scheduled Commands)',
+                        description: 'Schedule commands to run automatically at specified times using cron expressions. Perfect for automation, backups, and periodic tasks.'
+                    },
+                    'exec': {
+                        fullName: 'EXEC (Command Execution)',
+                        description: 'Execute shell commands and scripts. Allows the AI to run system commands with configurable security controls and deny patterns.'
+                    },
+                    'mcp': {
+                        fullName: 'MCP (Model Context Protocol)',
+                        description: 'Connect external tools and services through the Model Context Protocol. Enables integration with filesystems, databases, APIs, and more via standardized server plugins.'
+                    },
+                    'spawn': {
+                        fullName: 'SPAWN (Process Management)',
+                        description: 'Launch and manage background processes. Useful for running long-running tasks, servers, or scripts that need to execute independently.'
+                    },
+                    'append_file': {
+                        fullName: 'APPEND FILE',
+                        description: 'Add content to the end of existing files without overwriting. Useful for logs, incremental updates, and data collection.'
+                    },
+                    'edit_file': {
+                        fullName: 'EDIT FILE',
+                        description: 'Modify existing files by replacing specific sections. Enables precise file updates and code refactoring.'
+                    },
+                    'read_file': {
+                        fullName: 'READ FILE',
+                        description: 'Read and analyze file contents. Allows the AI to access and process information from local files.'
+                    },
+                    'list_dir': {
+                        fullName: 'LIST DIRECTORY',
+                        description: 'Browse directory contents and file structures. Helps the AI navigate and discover files in the filesystem.'
+                    },
+                    'find_skills': {
+                        fullName: 'FIND SKILLS',
+                        description: 'Search for and discover available skills from configured registries. Enables dynamic skill discovery and installation.'
+                    },
+                    'install_skill': {
+                        fullName: 'INSTALL SKILL',
+                        description: 'Download and install new skills from registries. Extends AI capabilities with community-created tools and workflows.'
+                    },
+                    'message': {
+                        fullName: 'MESSAGE',
+                        description: 'Send messages to channels and users. Enables proactive communication and notifications across configured platforms.'
+                    },
+                    'i2c': {
+                        fullName: 'I2C (Inter-Integrated Circuit)',
+                        description: 'Communicate with hardware devices using the I2C protocol. For embedded systems and hardware integration projects.'
+                    }
+                };
+                
+                return toolInfo[toolName] || {
+                    fullName: toolName.toUpperCase(),
+                    description: 'Tool configuration settings.'
+                };
+            }
+
+            getTabMetadata(tabId) {
+                const tabInfo = {
+                    'agents': {
+                        fullName: 'Agents Configuration',
+                        acronym: 'AI Agents',
+                        purpose: 'Default behavior settings for AI agents including which model to use, token limits, and workspace permissions.',
+                        whatToInput: '&#x2022; Select your default AI model from the Models list\n&#x2022; Set token limits (higher = longer responses but more cost)\n&#x2022; Configure temperature (0 = focused, 1 = creative)\n&#x2022; Set workspace path and security restrictions\n&#x2022; Adjust max tool iterations to control how many actions the AI can chain together'
+                    },
+                    'model_list': {
+                        fullName: 'Model List Configuration',
+                        acronym: 'Models',
+                        purpose: 'Configure AI models from various providers (OpenAI, Anthropic, DeepSeek, Gemini, etc.) with their API keys and settings.',
+                        whatToInput: '&#x2022; Add models with format: provider/model (e.g., openai/gpt-4, anthropic/claude-sonnet-4.6)\n&#x2022; Provide API keys from provider dashboards\n&#x2022; Set custom API endpoints for proxies or self-hosted models\n&#x2022; Configure authentication method (api_key or OAuth)\n&#x2022; Set thinking levels for reasoning models (o1, Claude, Gemini)'
+                    },
+                    'channels': {
+                        fullName: 'Channels Configuration',
+                        acronym: 'Chat Platforms',
+                        purpose: 'Connect PicoClaw to messaging platforms like Telegram, Discord, WhatsApp, Slack, and more.',
+                        whatToInput: '&#x2022; Enable channels you want to use\n&#x2022; Enter bot tokens from platform developer consoles\n&#x2022; Configure webhook URLs and paths\n&#x2022; Set user whitelists (allow_from) for security\n&#x2022; Configure platform-specific settings (encryption keys, app IDs, etc.)'
+                    },
+                    'gateway': {
+                        fullName: 'Gateway Server Configuration',
+                        acronym: 'HTTP (HyperText Transfer Protocol) Server',
+                        purpose: 'HTTP server that handles webhook-based channels (LINE, WeCom, etc.) and serves the web interface.',
+                        whatToInput: '&#x2022; Set bind address (127.0.0.1 for local only, 0.0.0.0 for external access)\n&#x2022; Choose port number (default: 18790)\n&#x2022; Configure CORS (Cross-Origin Resource Sharing) origins for web interface security\n&#x2022; Docker users must use 0.0.0.0 to access from host'
+                    },
+                    'session': {
+                        fullName: 'Session Management Configuration',
+                        acronym: 'Session Tracking',
+                        purpose: 'Controls how conversation sessions are tracked across different channels and users.',
+                        whatToInput: '&#x2022; Choose session scope strategy:\n  - "per-channel-peer": Separate sessions per platform+user (most secure)\n  - "per-peer": Shared sessions across platforms for same user ID\n  - "global": Single session for everyone (testing only)'
+                    },
+                    'providers': {
+                        fullName: 'Providers Configuration (DEPRECATED)',
+                        acronym: 'Legacy Providers',
+                        purpose: '&#x26A0;&#xFE0F; DEPRECATED: This config format is outdated. Please use the Models tab (model_list) instead for better multi-model support.',
+                        whatToInput: 'Migration recommended: Move your provider configurations to the Models tab. See config-guide.txt for migration instructions.'
+                    },
+                    'skills': {
+                        fullName: 'Skills Configuration',
+                        acronym: 'Skill Registries',
+                        purpose: 'Configure skill discovery and installation from registries like ClawHub. Skills extend AI capabilities with specialized tools.',
+                        whatToInput: '&#x2022; Enable/disable skill registries (ClawHub)\n&#x2022; Set registry URLs and authentication tokens\n&#x2022; Configure search and download limits\n&#x2022; Adjust cache settings for better performance'
+                    },
+                    'tools': {
+                        fullName: 'Tools Configuration',
+                        acronym: 'AI Tools',
+                        purpose: 'Enable and configure tools that extend agent capabilities: web search, command execution, file operations, MCP servers, and more.',
+                        whatToInput: '&#x2022; Enable/disable individual tools based on your needs\n&#x2022; Configure web search providers (Brave, Perplexity, SearXNG, DuckDuckGo)\n&#x2022; Set API keys for paid services\n&#x2022; Configure exec tool security (deny patterns)\n&#x2022; Set up MCP servers for external integrations'
+                    },
+                    'cron': {
+                        fullName: 'CRON (Scheduled Commands) Configuration',
+                        acronym: 'CRON = Command Run ON schedule',
+                        purpose: 'Schedule commands to run automatically at specified times using cron expressions (minute hour day month weekday).',
+                        whatToInput: '&#x2022; Create scheduled jobs with cron expressions (e.g., "0 2 * * *" for daily at 2am)\n&#x2022; Set job names for identification\n&#x2022; Define shell commands to execute\n&#x2022; Configure execution timeout to prevent runaway jobs\n&#x2022; Enable/disable jobs without deleting them'
+                    },
+                    'voice': {
+                        fullName: 'Voice Configuration',
+                        acronym: 'STT (Speech-to-Text) & TTS (Text-to-Speech)',
+                        purpose: 'Configure voice input (speech-to-text) and voice output (text-to-speech) for audio message handling. Supports local, cloud, and skill-based engines with various quality/cost tradeoffs.',
+                        whatToInput: '&#x2022; STT Engine Options:\n  - "cli": Local whisper/vosk (free, requires setup)\n  - "elevenlabs-transcribe": Realtime mic dictation (&#x1F4B0; paid, low CPU, high quality)\n  - "elevenlabs-stt": Audio file transcription (&#x1F4B0; paid)\n\n&#x2022; TTS Engine Options:\n  - "espeak/festival": Free, local, basic quality\n  - "edge-tts": Microsoft voices online (&#x2728; free, low CPU, good quality - RECOMMENDED)\n  - "elevenlabs": Premium quality (&#x1F4B0; paid)\n\n&#x2022; ElevenLabs API Key: Required for paid services - monitor usage to control costs!\n&#x2022; Skill Paths: Point to installed skill directories (~/.picoclaw/workspace/skills/...)\n&#x2022; Prerequisites: edge-tts needs Node.js, ElevenLabs skills need ffmpeg + python3'
+                    },
+                    'logging': {
+                        fullName: 'Logging Configuration',
+                        acronym: 'System Logs',
+                        purpose: 'Control logging behavior: verbosity level, log file location, and file rotation settings.',
+                        whatToInput: '&#x2022; Set log level: debug (all details), info (general), warn (warnings), error (errors only)\n&#x2022; Specify log file path (leave empty for console-only)\n&#x2022; Set max file size in MB for automatic rotation\n&#x2022; Use debug level for troubleshooting, info for production'
+                    }
+                };
+                
+                return tabInfo[tabId] || {
+                    fullName: tabId.toUpperCase().replace('_', ' '),
+                    acronym: '',
+                    purpose: 'Configuration settings for ' + tabId.replace('_', ' '),
+                    whatToInput: 'Configure the settings below. Hover over &#x2139;&#xFE0F; icons for detailed information about each field.'
+                };
+            }
+
+            renderConfigForm(sectionId, sectionData) {
+                const rawData = this.configRawData.config[sectionId];
+                const schema = this.getConfigSchema()[sectionId] || {};
+                const tabMeta = this.getTabMetadata(sectionId);
+                
+                let formHtml = `
+                    <div class="config-info" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 16px; border-radius: 8px; margin-bottom: 16px;">
+                        <strong style="font-size: 1.1rem;">&#x2139;&#xFE0F; About: ${tabMeta.acronym || tabMeta.fullName}</strong>
+                        <p style="margin: 8px 0 0 0; line-height: 1.5;">${tabMeta.purpose}</p>
+                    </div>
+                    <div class="config-info" style="background: #f0f9ff; border-color: #38bdf8; margin-bottom: 16px;">
+                        <strong>&#x1F4A1; What to configure here:</strong>
+                        <p style="white-space: pre-line; margin: 8px 0 0 0; line-height: 1.6;">${tabMeta.whatToInput}</p>
+                    </div>
+                    <form class="config-form" id="config-form-${sectionId}" onsubmit="event.preventDefault(); app.saveConfigSection('${sectionId}')">
+                `;
+                
+                if (sectionId === 'agents' && sectionData.defaults) {
+                    formHtml += '<div class="config-form-section"><div class="config-form-section-title">&#x1F916; Agent Defaults</div>';
+                    
+                    // Render model_name as a dropdown with all available models
+                    const modelList = this.configData.config.model_list || [];
+                    const currentModel = rawData?.defaults?.model_name || sectionData.defaults.model_name;
+                    
+                    formHtml += `
+                        <div class="config-form-group">
+                            <label class="config-form-label" for="agents-defaults-model_name">
+                                Default Model
+                                <span class="config-tooltip">&#x2139;&#xFE0F;<span class="config-tooltip-text">Select which AI model to use by default. Configure models below or in the Models tab.</span></span>
+                            </label>
+                            <select class="config-form-input" id="agents-defaults-model_name" name="agents.defaults.model_name" 
+                                    onchange="app.showSelectedModelConfig(this.value)">
+                                <option value="">-- Select a model --</option>
+                                ${modelList.map(m => `<option value="${this.escapeHtml(m.model_name)}" ${m.model_name === currentModel ? 'selected' : ''}>${this.escapeHtml(m.model_name)} (${this.escapeHtml(m.model || 'unknown')})</option>`).join('')}
+                            </select>
+                        </div>
+                        <div id="selected-model-config"></div>
+                    `;
+                    
+                    // Render other agent defaults (except model_name since we handled it above)
+                    for (const key in sectionData.defaults) {
+                        if (key !== 'model_name') {
+                            const value = sectionData.defaults[key];
+                            const rawValue = rawData?.defaults ? rawData.defaults[key] : value;
+                            const fieldSchema = schema.defaults?.[key];
+                            const fieldId = `agents-defaults-${key}`;
+                            const fieldName = `agents.defaults.${key}`;
+                            
+                            if (fieldSchema) {
+                                formHtml += this.renderField(key, rawValue, fieldId, fieldName, fieldSchema);
+                            }
+                        }
+                    }
+                    
+                    formHtml += '</div>';
+                    
+                    // Add a data attribute to trigger initial load
+                    formHtml += '<div id="model-trigger" data-model="' + this.escapeHtml(currentModel) + '" style="display:none;"></div>';
+                } else if (sectionId === 'gateway') {
+                    formHtml += '<div class="config-form-section"><div class="config-form-section-title">&#x1F310; Gateway Settings</div>';
+                    formHtml += this.renderFieldsFromSchema(sectionData, rawData, 'gateway', schema);
+                    formHtml += '</div>';
+                } else if (sectionId === 'session') {
+                    formHtml += '<div class="config-form-section"><div class="config-form-section-title">&#x1F511; Session Settings</div>';
+                    formHtml += this.renderFieldsFromSchema(sectionData, rawData, 'session', schema);
+                    formHtml += '</div>';
+                } else if (sectionId === 'voice') {
+                    formHtml += '<div class="config-form-section"><div class="config-form-section-title">&#x1F3A4; Voice Settings</div>';
+                    
+                    // Add helpful info boxes for voice skills
+                    formHtml += `
+                        <div class="config-info" style="background: #fef3c7; border-color: #fbbf24; margin-bottom: 12px;">
+                            <strong>&#x1F4B0; Cost Considerations:</strong><br>
+                            &#x2022; <strong>Free Options:</strong> edge-tts (Microsoft), espeak, festival, local whisper<br>
+                            &#x2022; <strong>Paid Options:</strong> ElevenLabs STT/TTS, Google Cloud, Azure<br>
+                            &#x2022; <strong>&#x26A0;&#xFE0F; Monitor Usage:</strong> Set ELEVENLABS_API_KEY environment variable and track API calls
+                        </div>
+                        
+                        <div class="config-info" style="background: #dbeafe; border-color: #60a5fa; margin-bottom: 12px;">
+                            <strong>&#x1F680; Quick Setup Guide:</strong><br>
+                            
+                            <strong>1) Edge-TTS (Recommended - Free):</strong><br>
+                            <code>cd ~/.picoclaw/workspace/skills/edge-tts/scripts</code><br>
+                            <code>npm install</code><br>
+                            <code>node tts-converter.js "Hello!" --voice en-US-MichelleNeural</code><br><br>
+                            
+                            <strong>2) ElevenLabs Realtime Dictation (Paid):</strong><br>
+                            <code>export ELEVENLABS_API_KEY="sk_your_key"</code><br>
+                            <code>~/.picoclaw/workspace/skills/elevenlabs-transcribe/scripts/transcribe.sh --mic --partials --lang en</code><br>
+                            Requires: ffmpeg + python3<br><br>
+                            
+                            <strong>3) ElevenLabs File Transcription (Paid):</strong><br>
+                            <code>~/.picoclaw/workspace/skills/elevenlabs-stt/scripts/transcribe.sh audio.mp3 --lang en</code>
+                        </div>
+                    `;
+                    
+                    formHtml += this.renderFieldsFromSchema(sectionData, rawData, 'voice', schema);
+                    formHtml += '</div>';
+                } else if (sectionId === 'logging') {
+                    formHtml += '<div class="config-form-section"><div class="config-form-section-title">&#x1F4DD; Logging Settings</div>';
+                    formHtml += this.renderFieldsFromSchema(sectionData, rawData, 'logging', schema);
+                    formHtml += '</div>';
+                } else if (sectionId === 'model_list' && Array.isArray(sectionData)) {
+                    const defaultModelName = this.configData.config.agents?.defaults?.model_name;
+                    
+                    sectionData.forEach((model, idx) => {
+                        const rawModel = rawData ? rawData[idx] : model;
+                        const isDefault = model.model_name === defaultModelName;
+                        
+                        formHtml += `
+                            <div class="config-form-section">
+                                <div class="config-form-section-title">
+                                    &#x1F9E0; Model ${idx + 1}: ${this.escapeHtml(model.model_name || 'Unnamed')}
+                                    ${isDefault ? '<span style="background: #10b981; color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; margin-left: 8px;">&#x2713; DEFAULT</span>' : ''}
+                                </div>
+                                <div class="config-info" style="font-size: 0.85rem; padding: 8px 12px;">
+                                    <strong>Provider/Model:</strong> ${this.escapeHtml(model.model || 'Not specified')}
+                                    ${isDefault ? '<br><strong>Status:</strong> This is your current default model' : ''}
+                                </div>
+                                ${this.renderFieldsFromSchema(model, rawModel, `model_list.[${idx}]`, schema)}
+                            </div>
+                        `;
+                    });
+                    
+                    formHtml += `
+                        <div class="config-info">
+                            <strong>&#x1F4A1; Tip:</strong> Go to the <strong>Agents</strong> tab to select which model is your default. 
+                            You can add more models by editing the raw JSON in the Overview tab.
+                        </div>
+                    `;
+                } else if (sectionId === 'channels' && typeof sectionData === 'object') {
+                    for (const channelName in sectionData) {
+                        const channel = sectionData[channelName];
+                        const rawChannel = rawData ? rawData[channelName] : channel;
+                        formHtml += `
+                            <div class="config-form-section">
+                                <div class="config-form-section-title">&#x1F4AC; ${channelName.toUpperCase()}</div>
+                                ${this.renderFieldsFromSchema(channel, rawChannel, `channels.${channelName}`, schema._common || {})}
+                            </div>
+                        `;
+                    }
+                } else if (sectionId === 'providers' && typeof sectionData === 'object') {
+                    for (const providerName in sectionData) {
+                        const provider = sectionData[providerName];
+                        const rawProvider = rawData ? rawData[providerName] : provider;
+                        formHtml += `
+                            <div class="config-form-section">
+                                <div class="config-form-section-title">&#x1F50C; ${providerName.toUpperCase()}</div>
+                                ${this.renderFieldsFromSchema(provider, rawProvider, `providers.${providerName}`, schema._common || {})}
+                            </div>
+                        `;
+                    }
+                } else if (sectionId === 'tools' && typeof sectionData === 'object') {
+                    for (const toolName in sectionData) {
+                        const tool = sectionData[toolName];
+                        const rawTool = rawData ? rawData[toolName] : tool;
+                        
+                        // Special handling for web tools with nested search providers
+                        if (toolName === 'web' && typeof tool === 'object') {
+                            formHtml += `
+                                <div class="config-form-section">
+                                    <div class="config-form-section-title">&#x1F310; WEB SEARCH PROVIDERS</div>
+                                    <div class="config-info" style="background: #ecfeff; border-color: #67e8f9;">
+                                        <strong>&#x1F3C6; Provider Priority:</strong> Perplexity > Brave > SearXNG > Tavily > DuckDuckGo > GLM Search<br>
+                                        <strong>&#x1F4A1; Recommendation:</strong> Enable DuckDuckGo (free, no API key) + one paid provider for best results
+                                    </div>
+                            `;
+                            
+                            // Render each web search provider
+                            const webProviders = {
+                                'perplexity': {
+                                    icon: '&#x1F50D;',
+                                    title: 'Perplexity AI Search',
+                                    description: 'AI-powered search with citations and summaries. Highest quality results.',
+                                    link: 'https://www.perplexity.ai',
+                                    pricing: 'API access requires account',
+                                    note: '&#x2B50; Best option: AI-enhanced results with source citations'
+                                },
+                                'brave': {
+                                    icon: '&#x1F981;',
+                                    title: 'Brave Search',
+                                    description: 'Privacy-focused search with high-quality results. Paid API service.',
+                                    link: 'https://brave.com/search/api',
+                                    pricing: '$5 per 1000 queries (~$5-6/month typical usage)',
+                                    note: '&#x1F4B0; Paid service, but excellent quality and privacy-focused'
+                                },
+                                'searxng': {
+                                    icon: '&#x1F310;',
+                                    title: 'SearXNG',
+                                    description: 'Self-hosted metasearch engine aggregating 70+ search providers. Perfect for cloud VMs.',
+                                    link: 'https://github.com/searxng/searxng',
+                                    pricing: 'Free (self-hosted)',
+                                    note: '&#x2601;&#xFE0F; Best for cloud VMs: Solves datacenter IP blocking, unlimited queries, no API keys needed'
+                                },
+                                'tavily': {
+                                    icon: '&#x1F916;',
+                                    title: 'Tavily Search',
+                                    description: 'AI-optimized search API designed specifically for LLM agents.',
+                                    link: 'https://tavily.com',
+                                    pricing: '1000 queries free/month, then paid tiers',
+                                    note: '&#x1F193; Free tier available: Good starting option'
+                                },
+                                'duckduckgo': {
+                                    icon: '&#x1F986;',
+                                    title: 'DuckDuckGo',
+                                    description: 'Privacy-focused search engine. No API key required, enabled by default as fallback.',
+                                    link: 'https://duckduckgo.com',
+                                    pricing: 'Free, no API key needed',
+                                    note: '&#x2B50; Recommended: Always enable as fallback (no setup required)'
+                                },
+                                'glm_search': {
+                                    icon: '&#x1F1E8;&#x1F1F3;',
+                                    title: 'GLM Search',
+                                    description: 'Chinese search engine by Zhipu AI, optimized for Chinese language queries.',
+                                    link: 'https://open.bigmodel.cn',
+                                    pricing: 'Requires GLM API account',
+                                    note: '&#x1F1E8;&#x1F1F3; Best for Chinese language searches'
+                                }
+                            };
+                            
+                            for (const providerName in tool) {
+                                const provider = tool[providerName];
+                                const rawProvider = rawTool ? rawTool[providerName] : provider;
+                                const providerInfo = webProviders[providerName] || { icon: '&#x1F50D;', title: providerName.toUpperCase() };
+                                
+                                formHtml += `
+                                    <div class="config-form-section" style="margin-top: 12px; background: #f0fdfa; border: 1px solid #5eead4;">
+                                        <div class="config-form-section-title">${providerInfo.icon} ${providerInfo.title}</div>
+                                        ${providerInfo.description ? `
+                                            <div class="config-info" style="background: #ccfbf1; border-color: #5eead4; font-size: 0.85rem;">
+                                                <strong>&#x2139;&#xFE0F; About:</strong> ${providerInfo.description}<br>
+                                                ${providerInfo.link ? `<strong>&#x1F511; Get API Key:</strong> <a href="${providerInfo.link}" target="_blank" style="color: #0891b2; text-decoration: underline;">${providerInfo.link}</a><br>` : ''}
+                                                ${providerInfo.pricing ? `<strong>&#x1F4B0; Pricing:</strong> ${providerInfo.pricing}<br>` : ''}
+                                                ${providerInfo.note ? `<strong>&#x1F4A1; Note:</strong> ${providerInfo.note}` : ''}
+                                            </div>
+                                        ` : ''}
+                                        ${this.renderFieldsFromSchema(provider, rawProvider, `tools.web.${providerName}`, schema._common || {})}
+                                    </div>
+                                `;
+                            }
+                            
+                            formHtml += `</div>`;
+                        } else {
+                            // Regular tool rendering with metadata
+                            const toolMeta = this.getToolMetadata(toolName);
+                            formHtml += `
+                                <div class="config-form-section">
+                                    <div class="config-form-section-title">&#x1F527; ${toolMeta.fullName}</div>
+                                    <div class="config-info" style="background: #eff6ff; border-color: #93c5fd; font-size: 0.85rem; margin-bottom: 12px;">
+                                        <strong>&#x2139;&#xFE0F; About:</strong> ${toolMeta.description}
+                                    </div>
+                                    ${this.renderFieldsFromSchema(tool, rawTool, `tools.${toolName}`, schema._common || {})}
+                                </div>
+                            `;
+                        }
+                    }
+                } else if (sectionId === 'skills' && typeof sectionData === 'object') {
+                    for (const skillName in sectionData) {
+                        const skill = sectionData[skillName];
+                        const rawSkill = rawData ? rawData[skillName] : skill;
+                        formHtml += `
+                            <div class="config-form-section">
+                                <div class="config-form-section-title">&#x1F3AF; ${skillName.toUpperCase()}</div>
+                                ${this.renderFieldsFromSchema(skill, rawSkill, `skills.${skillName}`, schema._common || {})}
+                            </div>
+                        `;
+                    }
+                } else if (sectionId === 'cron' && typeof sectionData === 'object') {
+                    // Add helpful description for CRON section
+                    formHtml += `
+                        <div class="config-info" style="background: #fef3c7; border-color: #fcd34d; margin-bottom: 12px;">
+                            <strong>&#x23F0; About CRON (Scheduled Commands):</strong> Schedule commands to run automatically at specified times using cron expressions. Perfect for automation, backups, and periodic tasks. Format: <code>minute hour day month weekday</code>
+                        </div>
+                    `;
+                    
+                    if (Array.isArray(sectionData.jobs)) {
+                        sectionData.jobs.forEach((job, idx) => {
+                            const rawJob = rawData?.jobs ? rawData.jobs[idx] : job;
+                            const cronSchema = this.getConfigSchema().cron?.jobs || {};
+                            formHtml += `
+                                <div class="config-form-section">
+                                    <div class="config-form-section-title">&#x23F0; Job ${idx + 1}: ${this.escapeHtml(job.name || 'Unnamed')}</div>
+                                    ${this.renderFieldsFromSchema(job, rawJob, `cron.jobs.[${idx}]`, cronSchema)}
+                                </div>
+                            `;
+                        });
+                    } else {
+                        formHtml += '<div class="config-form-section">';
+                        formHtml += '<div class="config-form-section-title">&#x23F0; Cron Settings</div>';
+                        formHtml += this.renderFieldsFromSchema(sectionData, rawData, 'cron', {});
+                        formHtml += '</div>';
+                    }
+                } else if (typeof sectionData === 'object' && !Array.isArray(sectionData)) {
+                    // Generic object rendering with auto-detected fields
+                    formHtml += '<div class="config-form-section">';
+                    formHtml += `<div class="config-form-section-title">&#x2699;&#xFE0F; ${sectionId.toUpperCase().replace('_', ' ')} Settings</div>`;
+                    formHtml += this.renderFieldsFromSchema(sectionData, rawData, sectionId, {});
+                    formHtml += '</div>';
+                } else {
+                    // Complex data structures - show JSON
+                    formHtml += `<div class="config-json">${JSON.stringify(sectionData, null, 2)}</div>`;
+                    formHtml += `<div class="config-info"><strong>&#x2139;&#xFE0F; Note:</strong> Use the Overview tab's Edit mode to modify this section.</div>`;
+                    return formHtml + `</form>`;
+                }
+                
+                formHtml += `
+                    <div class="config-edit-actions">
+                        <button type="submit" class="config-btn config-btn-success">&#x1F4BE; Save Changes</button>
+                        <button type="button" class="config-btn config-btn-secondary" onclick="app.showConfig()">&#x267B;&#xFE0F; Reset</button>
+                    </div>
+                </form>
+                `;
+                
+                return formHtml;
+            }
+
+            renderFieldsFromSchema(data, rawData, path, schema) {
+                let html = '';
+                
+                for (const key in data) {
+                    const value = data[key];
+                    const rawValue = rawData ? rawData[key] : value;
+                    const fieldSchema = schema[key] || (schema._common ? schema._common[key] : null);
+                    const fieldId = `${path}.${key}`.replace(/\./g, '-');
+                    const fieldName = `${path}.${key}`;
+                    
+                    if (fieldSchema) {
+                        html += this.renderField(key, rawValue, fieldId, fieldName, fieldSchema);
+                    } else {
+                        // Auto-detect type
+                        const detectedType = this.detectFieldType(rawValue);
+                        // Skip nested objects - they should be handled by custom rendering
+                        if (detectedType === 'object') {
+                            continue;
+                        }
+                        html += this.renderField(key, rawValue, fieldId, fieldName, {
+                            type: detectedType,
+                            label: this.beautifyLabel(key),
+                            description: `Configuration value for ${key}`
+                        });
+                    }
+                }
+                
+                return html;
+            }
+
+            renderField(key, value, fieldId, fieldName, schema) {
+                const { type, label, description, min, max, step, placeholder, options } = schema;
+                const tooltip = description ? `<span class="config-tooltip">&#x2139;&#xFE0F;<span class="config-tooltip-text">${this.escapeHtml(description)}</span></span>` : '';
+                
+                let fieldHtml = '';
+                
+                // Skip rendering nested objects
+                if (type === 'object') {
+                    return '';
+                }
+                
+                if (type === 'boolean') {
+                    fieldHtml = `
+                        <div class="config-form-group">
+                            <div class="config-checkbox-wrapper">
+                                <input type="checkbox" class="config-form-input" id="${fieldId}" name="${fieldName}"
+                                       ${value ? 'checked' : ''}>
+                                <label class="config-checkbox-label" for="${fieldId}">
+                                    <span>${label}</span>
+                                    ${tooltip}
+                                </label>
+                            </div>
+                        </div>
+                    `;
+                } else if (type === 'select') {
+                    const selectOptions = options || [];
+                    fieldHtml = `
+                        <div class="config-form-group">
+                            <label class="config-form-label" for="${fieldId}">
+                                <span>${label}</span>
+                                ${tooltip}
+                            </label>
+                            <select class="config-form-input" id="${fieldId}" name="${fieldName}">
+                                <option value="">-- Select ${label} --</option>
+                                ${selectOptions.map(opt => `
+                                    <option value="${this.escapeHtml(opt.value)}" ${value === opt.value ? 'selected' : ''}>
+                                        ${this.escapeHtml(opt.label)}
+                                    </option>
+                                `).join('')}
+                            </select>
+                        </div>
+                    `;
+                } else if (type === 'number') {
+                    fieldHtml = `
+                        <div class="config-form-group">
+                            <label class="config-form-label" for="${fieldId}">
+                                <span>${label}</span>
+                                ${tooltip}
+                            </label>
+                            <div class="config-number-wrapper">
+                                <input type="number" class="config-form-input" id="${fieldId}" name="${fieldName}"
+                                       value="${value || ''}" 
+                                       ${min !== undefined ? `min="${min}"` : ''}
+                                       ${max !== undefined ? `max="${max}"` : ''}
+                                       ${step !== undefined ? `step="${step}"` : ''}
+                                       placeholder="${placeholder || ''}">
+                                <div class="config-number-controls">
+                                    <button type="button" class="config-number-btn" onclick="app.incrementNumber('${fieldId}', ${step || 1})">&#x25B2;</button>
+                                    <button type="button" class="config-number-btn" onclick="app.decrementNumber('${fieldId}', ${step || 1})">&#x25BC;</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else if (type === 'password') {
+                    const isMasked = value && value.includes('***');
+                    fieldHtml = `
+                        <div class="config-form-group">
+                            <label class="config-form-label" for="${fieldId}">
+                                <span>${label}</span>
+                                ${tooltip}
+                            </label>
+                            <input type="password" class="config-form-input" id="${fieldId}" name="${fieldName}"
+                                   value="${this.escapeHtml(value || '')}"
+                                   placeholder="${isMasked ? '(unchanged)' : placeholder || 'Enter ' + label}">
+                            ${isMasked ? `<div class="config-field-description">Leave blank to keep existing value</div>` : ''}
+                        </div>
+                    `;
+                } else if (type === 'array') {
+                    const arrayValue = Array.isArray(value) ? value.join(', ') : '';
+                    fieldHtml = `
+                        <div class="config-form-group">
+                            <label class="config-form-label" for="${fieldId}">
+                                <span>${label}</span>
+                                ${tooltip}
+                            </label>
+                            <input type="text" class="config-form-input" id="${fieldId}" name="${fieldName}"
+                                   value="${this.escapeHtml(arrayValue)}"
+                                   placeholder="Comma-separated values">
+                            <div class="config-field-description">Enter values separated by commas</div>
+                        </div>
+                    `;
+                } else {
+                    // Default to text input
+                    fieldHtml = `
+                        <div class="config-form-group">
+                            <label class="config-form-label" for="${fieldId}">
+                                <span>${label}</span>
+                                ${tooltip}
+                            </label>
+                            <input type="text" class="config-form-input" id="${fieldId}" name="${fieldName}"
+                                   value="${this.escapeHtml(value || '')}"
+                                   placeholder="${placeholder || 'Enter ' + label}">
+                        </div>
+                    `;
+                }
+                
+                return fieldHtml;
+            }
+
+            incrementNumber(fieldId, step) {
+                const input = document.getElementById(fieldId);
+                if (input) {
+                    const val = parseFloat(input.value) || 0;
+                    const max = input.max ? parseFloat(input.max) : Infinity;
+                    input.value = Math.min(val + step, max);
+                }
+            }
+
+            decrementNumber(fieldId, step) {
+                const input = document.getElementById(fieldId);
+                if (input) {
+                    const val = parseFloat(input.value) || 0;
+                    const min = input.min ? parseFloat(input.min) : -Infinity;
+                    input.value = Math.max(val - step, min);
+                }
+            }
+
+            detectFieldType(value) {
+                if (typeof value === 'boolean') return 'boolean';
+                if (typeof value === 'number') return 'number';
+                if (Array.isArray(value)) return 'array';
+                if (typeof value === 'object' && value !== null) return 'object'; // Skip rendering nested objects
+                return 'string';
+            }
+
+            beautifyLabel(key) {
+                return key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+            }
+
+            showSelectedModelConfig(modelName) {
+                const container = document.getElementById('selected-model-config');
+                if (!container) return;
+                
+                if (!modelName) {
+                    container.innerHTML = '';
+                    return;
+                }
+                
+                const modelList = this.configData.config.model_list || [];
+                const rawModelList = this.configRawData.config.model_list || [];
+                const modelIndex = modelList.findIndex(m => m.model_name === modelName);
+                
+                if (modelIndex === -1) {
+                    container.innerHTML = `<div class="config-info" style="background: #fff3cd; border-color: #ffc107; color: #856404;">&#x26A0;&#xFE0F; Model "${this.escapeHtml(modelName)}" not found in model_list. Add it in the Models tab.</div>`;
+                    return;
+                }
+                
+                const model = modelList[modelIndex];
+                const rawModel = rawModelList[modelIndex] || model;
+                const schema = this.getConfigSchema().model_list;
+                
+                let html = `
+                    <div class="config-form-section" style="margin-top: 12px; background: #eff6ff; border-color: #bfdbfe;">
+                        <div class="config-form-section-title">&#x2699;&#xFE0F; Configure: ${this.escapeHtml(modelName)}</div>
+                        <div class="config-info" style="background: #dbeafe;">
+                            <strong>Model:</strong> ${this.escapeHtml(model.model || 'Not specified')}<br>
+                            <strong>Provider:</strong> ${this.escapeHtml(model.model?.split('/')[0] || 'Unknown')}
+                        </div>
+                `;
+                
+                // Render model configuration fields
+                for (const key in model) {
+                    if (key === 'model_name') continue; // Skip, already shown in dropdown
+                    
+                    const value = model[key];
+                    const rawValue = rawModel[key];
+                    const fieldSchema = schema[key];
+                    const fieldId = `model_list-${modelIndex}-${key}`;
+                    const fieldName = `model_list.[${modelIndex}].${key}`;
+                    
+                    if (fieldSchema) {
+                        html += this.renderField(key, rawValue, fieldId, fieldName, fieldSchema);
+                    } else {
+                        html += this.renderField(key, rawValue, fieldId, fieldName, {
+                            type: this.detectFieldType(rawValue),
+                            label: this.beautifyLabel(key),
+                            description: `Configuration value for ${key}`
+                        });
+                    }
+                }
+                
+                html += `
+                        <div class="config-field-description">
+                            &#x2139;&#xFE0F; Changes here update the model in your model_list. Visit the Models tab to add/remove models.
+                        </div>
+                    </div>
+                `;
+                
+                container.innerHTML = html;
+            }
+            
+            editOverview() {
+                this.configEditMode = true;
+                this.renderAllTabContent();
+            }
+            
+            cancelEditOverview() {
+                this.configEditMode = false;
+                this.renderAllTabContent();
+            }
+            
+            async saveOverview() {
+                const textarea = document.getElementById('config-edit-textarea');
+                if (!textarea) return;
+                
+                try {
+                    const newConfig = JSON.parse(textarea.value);
+                    
+                    // Validate configuration before saving
+                    const validation = this.validateConfiguration(newConfig);
+                    
+                    // Show errors and warnings
+                    if (validation.errors.length > 0 || validation.warnings.length > 0) {
+                        let message = '';
+                        
+                        if (validation.errors.length > 0) {
+                            message += '&#x274C; ERRORS (must fix before saving):\n\n';
+                            message += validation.errors.join('\n\n') + '\n\n';
+                        }
+                        
+                        if (validation.warnings.length > 0) {
+                            message += '&#x26A0;&#xFE0F; WARNINGS (review recommended):\n\n';
+                            message += validation.warnings.join('\n\n') + '\n\n';
+                        }
+                        
+                        if (validation.errors.length > 0) {
+                            message += '\n\nPlease fix the errors in the JSON before saving.';
+                            alert(message);
+                            return;
+                        } else {
+                            message += '\n\nDo you want to save anyway?';
+                            if (!confirm(message)) {
+                                return;
+                            }
+                        }
+                    }
+                    
+                    const response = await fetch('/api/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ config: newConfig })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        alert('&#x2705; Configuration saved successfully!');
+                        this.configEditMode = false;
+                        await this.showConfig(); // Reload config
+                        await this.updateCurrentModel(); // Update model display
+                        
+                        // Prompt to restart gateway
+                        if (confirm('&#x267B;&#xFE0F; Gateway restart recommended for changes to take effect.\n\nRestart gateway now?')) {
+                            await this.restartGateway();
+                        }
+                    } else {
+                        alert('&#x274C; Failed to save: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('&#x274C; Invalid JSON: ' + error.message);
+                }
+            }
+            
+            
+            validateConfiguration(config) {
+                const warnings = [];
+                const errors = [];
+                
+                // Check if default model exists in model_list
+                if (config.agents?.defaults?.model_name) {
+                    const modelName = config.agents.defaults.model_name;
+                    const modelExists = config.model_list?.some(m => m.model_name === modelName);
+                    if (!modelExists) {
+                        errors.push(`? Default model "${modelName}" not found in model_list. Agent won't start!`);
+                    } else {
+                        // Check if the model has valid credentials
+                        const model = config.model_list.find(m => m.model_name === modelName);
+                        if (model?.auth_method !== 'oauth' && !model?.api_key) {
+                            warnings.push(`?? Model "${modelName}" has no API key. Authentication will fail unless using OAuth.`);
+                        }
+                    }
+                }
+                
+                // Check for multiple enabled channels on same port
+                if (config.channels) {
+                    const portMap = {};
+                    for (const [channelName, channelConfig] of Object.entries(config.channels)) {
+                        if (channelConfig.enabled && channelConfig.port) {
+                            const port = channelConfig.port;
+                            if (portMap[port]) {
+                                errors.push(`? Port ${port} conflict: Both "${portMap[port]}" and "${channelName}" channels trying to use same port!`);
+                            } else {
+                                portMap[port] = channelName;
+                            }
+                        }
+                    }
+                }
+                
+                // Check exec tool security
+                if (config.tools?.exec?.enable_deny_patterns === false) {
+                    warnings.push(`?? Exec tool: Dangerous command blocking is DISABLED. Only disable in fully trusted environments!`);
+                }
+                
+                // Check gateway host for Docker users
+                if (config.gateway?.host === '127.0.0.1') {
+                    warnings.push(`?? Gateway host is localhost (127.0.0.1). If using Docker, change to 0.0.0.0 for external access.`);
+                }
+                
+                // Check for workspace restrictions
+                if (config.agents?.defaults?.restrict_to_workspace === false) {
+                    warnings.push(`?? Workspace restriction is DISABLED. Agent can access any file on system. Enable for production security!`);
+                }
+                
+                // Check temperature range
+                if (config.agents?.defaults?.temperature > 1.5) {
+                    warnings.push(`?? Temperature is very high (${config.agents.defaults.temperature}). Expect highly random/creative outputs.`);
+                }
+                
+                // Check max_tokens
+                if (config.agents?.defaults?.max_tokens < 1000) {
+                    warnings.push(`?? Max tokens is very low (${config.agents.defaults.max_tokens}). May truncate responses.`);
+                }
+                
+                // Check MCP servers configuration
+                if (config.tools?.mcp?.enabled && config.tools.mcp.servers) {
+                    for (const [serverName, serverConfig] of Object.entries(config.tools.mcp.servers)) {
+                        if (serverConfig.enabled) {
+                            if (!serverConfig.type && !serverConfig.command && !serverConfig.url) {
+                                warnings.push(`?? MCP server "${serverName}": No command or URL specified. Server won't start.`);
+                            }
+                            if (serverConfig.type === 'stdio' && !serverConfig.command) {
+                                errors.push(`? MCP server "${serverName}": Type is "stdio" but no command specified!`);
+                            }
+                            if ((serverConfig.type === 'sse' || serverConfig.type === 'http') && !serverConfig.url) {
+                                errors.push(`? MCP server "${serverName}": Type is "${serverConfig.type}" but no URL specified!`);
+                            }
+                        }
+                    }
+                }
+                
+                // Check web search tools - only one should be enabled typically
+                if (config.tools?.web) {
+                    const enabledSearchTools = [];
+                    ['brave', 'duckduckgo', 'perplexity', 'searxng', 'tavily', 'glm_search'].forEach(tool => {
+                        if (config.tools.web[tool]?.enabled) {
+                            enabledSearchTools.push(tool);
+                        }
+                    });
+                    if (enabledSearchTools.length > 2) {
+                        warnings.push(`?? Multiple web search tools enabled (${enabledSearchTools.join(', ')}). Consider using only 1-2 for efficiency.`);
+                    }
+                    
+                    // Check for API keys
+                    ['brave', 'perplexity', 'tavily', 'glm_search'].forEach(tool => {
+                        if (config.tools.web[tool]?.enabled && !config.tools.web[tool]?.api_key) {
+                            errors.push(`? Web tool "${tool}" is enabled but has no API key!`);
+                        }
+                    });
+                }
+                
+                // Check for deprecated providers section
+                if (config.providers && Object.keys(config.providers).some(k => k !== '_comment')) {
+                    warnings.push(`?? Using deprecated "providers" section. Migrate to "model_list" format for better flexibility.`);
+                }
+                
+                // Check cron jobs
+                if (config.cron?.jobs && Array.isArray(config.cron.jobs)) {
+                    config.cron.jobs.forEach((job, idx) => {
+                        if (job.enabled && !job.schedule) {
+                            errors.push(`? Cron job "${job.name || 'Job ' + (idx + 1)}" is enabled but has no schedule!`);
+                        }
+                        if (job.enabled && !job.command) {
+                            errors.push(`? Cron job "${job.name || 'Job ' + (idx + 1)}" is enabled but has no command!`);
+                        }
+                    });
+                }
+                
+                return { errors, warnings };
+            }
+            
+            async saveConfigSection(sectionId) {
+                const form = document.getElementById('config-form-' + sectionId);
+                if (!form) return;
+                
+                const formData = new FormData(form);
+                const newConfig = JSON.parse(JSON.stringify(this.configRawData.config));
+                
+                // Collect checkboxes that are unchecked (FormData doesn't include them)
+                const allInputs = form.querySelectorAll('input[type="checkbox"]');
+                const checkboxStates = {};
+                allInputs.forEach(input => {
+                    checkboxStates[input.name] = input.checked;
+                });
+                
+                // Update config based on form data
+                for (const [name, value] of formData.entries()) {
+                    this.setNestedValue(newConfig, name, value, form.querySelector(`[name="${name}"]`));
+                }
+                
+                // Handle unchecked checkboxes
+                for (const [name, checked] of Object.entries(checkboxStates)) {
+                    if (!formData.has(name)) {
+                        this.setNestedValue(newConfig, name, '', form.querySelector(`[name="${name}"]`), checked);
+                    }
+                }
+                
+                // Validate configuration before saving
+                const validation = this.validateConfiguration(newConfig);
+                
+                // Show errors and warnings
+                if (validation.errors.length > 0 || validation.warnings.length > 0) {
+                    let message = '';
+                    
+                    if (validation.errors.length > 0) {
+                        message += '&#x274C; ERRORS (must fix before saving):\n\n';
+                        message += validation.errors.join('\n\n') + '\n\n';
+                    }
+                    
+                    if (validation.warnings.length > 0) {
+                        message += '&#x26A0;&#xFE0F; WARNINGS (review recommended):\n\n';
+                        message += validation.warnings.join('\n\n') + '\n\n';
+                    }
+                    
+                    if (validation.errors.length > 0) {
+                        message += '\n\nPlease fix the errors before saving.';
+                        alert(message);
+                        return;
+                    } else {
+                        message += '\n\nDo you want to save anyway?';
+                        if (!confirm(message)) {
+                            return;
+                        }
+                    }
+                }
+                
+                try {
+                    const response = await fetch('/api/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ config: newConfig })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        alert('&#x2705; Configuration saved successfully!');
+                        await this.showConfig(); // Reload config
+                        await this.updateCurrentModel(); // Update model display
+                        
+                        // Prompt to restart gateway
+                        if (confirm('&#x267B;&#xFE0F; Gateway restart recommended for changes to take effect.\n\nRestart gateway now?')) {
+                            await this.restartGateway();
+                        }
+                    } else {
+                        alert('&#x274C; Failed to save: ' + result.error);
+                    }
+                } catch (error) {
+                    alert('&#x274C; Failed to save: ' + error.message);
+                }
+            }
+            
+            setNestedValue(obj, path, value, input, checkboxValue) {
+                // Parse path like "agents.defaults.max_tokens" or "model_list.[0].api_key"
+                const parts = path.split('.').filter(p => p);
+                let current = obj;
+                
+                for (let i = 0; i < parts.length - 1; i++) {
+                    const part = parts[i];
+                    
+                    // Handle array notation [0]
+                    if (part.startsWith('[') && part.endsWith(']')) {
+                        const index = parseInt(part.slice(1, -1), 10);
+                        if (!Array.isArray(current)) current = [];
+                        if (!current[index]) current[index] = {};
+                        current = current[index];
+                    } else {
+                        if (!current[part]) current[part] = {};
+                        current = current[part];
+                    }
+                }
+                
+                const lastKey = parts[parts.length - 1];
+                
+                // Determine the correct value type
+                if (input && input.type === 'checkbox') {
+                    current[lastKey] = checkboxValue !== undefined ? checkboxValue : input.checked;
+                } else if (input && input.type === 'number') {
+                    const numValue = parseFloat(value);
+                    current[lastKey] = isNaN(numValue) ? 0 : numValue;
+                } else if (input && input.type === 'password') {
+                    // Only update if not empty (allows keeping existing value)
+                    if (value && value.trim()) {
+                        current[lastKey] = value;
+                    }
+                } else if (this.getConfigSchema()[parts[0]]?.[lastKey]?.type === 'array' || 
+                           this.getConfigSchema()[parts[0]]?._common?.[lastKey]?.type === 'array') {
+                    // Handle array fields (comma-separated values)
+                    current[lastKey] = value ? value.split(',').map(v => v.trim()).filter(v => v) : [];
+                } else {
+                    current[lastKey] = value;
+                }
+            }
+            
+            hideConfigModal() {
+                this.el.configModal.classList.remove('show');
+                // Restore focus to message input to prevent blocking
+                setTimeout(() => {
+                    if (this.el.messageInput) {
+                        this.el.messageInput.focus();
+                    }
+                }, 100);
+            }
+
+            toggleMatrixTheme() {
+                const modalContent = document.querySelector('.config-modal-content');
+                const toggleBtn = document.getElementById('matrixToggle');
+                
+                if (modalContent.classList.contains('matrix-theme')) {
+                    modalContent.classList.remove('matrix-theme');
+                    toggleBtn.textContent = 'MATRIX';
+                    localStorage.setItem('picoclaw-config-theme', 'normal');
+                } else {
+                    modalContent.classList.add('matrix-theme');
+                    toggleBtn.textContent = 'NORMAL';
+                    localStorage.setItem('picoclaw-config-theme', 'matrix');
+                }
+            }
+
+            showHelp() {
+                const helpText = `PicoClaw Web Interface Help\\n\\n` +
+                    `Features:\\n` +
+                    `&#x2022; Voice input: Click mic button (requires Whisper)\\n` +
+                    `&#x2022; Text-to-speech: Click speaker button for AI responses\\n` +
+                    `&#x2022; Multiple sessions: Create new chats from sidebar\\n` +
+                    `&#x2022; Connection status: Check gateway status in bottom-right\\n\\n` +
+                    `Keyboard Shortcuts:\\n` +
+                    `&#x2022; Enter: Send message\\n` +
+                    `&#x2022; Shift+Enter: New line\\n\\n` +
+                    `Documentation: Check README.md in the project root`;
+                alert(helpText);
+            }
 
             //  Messaging 
             async sendMessage() {
@@ -1007,7 +2016,7 @@
                     if (this.isConnected) {
                         reply = await this.sendToPicoClaw(text);
                     } else {
-                        throw new Error('Gateway not connected — check the status indicator');
+                        throw new Error('Gateway not connected &#x2013; check the status indicator');
                     }
                     this.removeTyping(typingId);
                     this.addMessage('assistant', reply);
@@ -1040,7 +2049,7 @@
                 saveStore(this.store);
                 this._appendMessage(msg);
                 this.scrollToBottom();
-                // Auto-select new assistant messages so ▶️ plays the latest reply
+                // Auto-select new assistant messages so &#x1F50A; plays the latest reply
                 if (role === 'assistant') {
                     const el = this.el.messages.querySelector('.message[data-msgid="' + msg.id + '"]');
                     if (el) this._ttsSelect(el, content);
@@ -1096,7 +2105,7 @@
                 this.renderMessages();
             }
 
-            // ── Voice: capabilities check ──────────────────────────────────────
+            // -- Voice: capabilities check --------------------------------------
             async checkCapabilities() {
                 try {
                     const res = await fetch(this.apiUrl + '/api/capabilities');
@@ -1107,7 +2116,7 @@
                 } catch {}
             }
 
-            // ── Voice: TTS toggle ──────────────────────────────────────────────
+            // -- Voice: TTS toggle ----------------------------------------------
             toggleTts() {
                 this.ttsEnabled = !this.ttsEnabled;
                 this.el.ttsBtn.textContent = this.ttsEnabled ? '\uD83D\uDD0A' : '\uD83D\uDD07';
@@ -1131,7 +2140,7 @@
                 el.classList.add('tts-selected');
                 this.ttsLastText = text;
                 this.ttsSelectedEl = el;
-                // Only switch audio if already playing — never auto-start
+                // Only switch audio if already playing &#x2013; never auto-start
                 if (this._ttsState === 'playing') this._speak(text);
             }
 
@@ -1172,7 +2181,7 @@
             _ttsSetProcessing() {
                 this.el.ttsPauseBtn.classList.add('processing');
                 this.el.ttsPauseBtn.textContent = '';
-                this.el.ttsPauseBtn.title = 'Processing…';
+                this.el.ttsPauseBtn.title = 'Processing&#x2026;';
                 this.el.ttsPauseBtn.disabled = true;
             }
 
@@ -1186,7 +2195,7 @@
                     speechSynthesis.resume();
                     this._ttsSetPlaying();
                 } else {
-                    // Idle — check for a live text selection first
+                    // Idle &#x2013; check for a live text selection first
                     const sel = window.getSelection();
                     const selText = sel && sel.toString().trim();
                     if (selText) {
@@ -1207,7 +2216,7 @@
                 }
             }
 
-            // Restart with updated settings — only cancel if something is actually running.
+            // Restart with updated settings &#x2013; only cancel if something is actually running.
             // The Web Speech API has no restart() or seek, so cancel() + speak() is the only way
             // to apply new settings mid-utterance.
             _ttsRestartIfPlaying() {
@@ -1216,8 +2225,8 @@
                 }
             }
 
-            // Stop = cancel only if something is running, then reset to ▶️ ready to replay.
-            // ttsLastText is preserved so ▶️ replays from the beginning.
+            // Stop = cancel only if something is running, then reset to ?? ready to replay.
+            // ttsLastText is preserved so ?? replays from the beginning.
             ttsStop() {
                 if (this._ttsState !== 'idle') {
                     speechSynthesis.cancel();
@@ -1228,7 +2237,7 @@
 
             // _speak: cancel() is only called when something is already playing/paused
             // (i.e. we're switching content or applying new settings).
-            // When idle, speak() is called directly — no cancel() needed, no delay needed.
+            // When idle, speak() is called directly &#x2013; no cancel() needed, no delay needed.
             _speak(text) {
                 if (!text) return;
                 this.ttsLastText = text;
@@ -1268,18 +2277,48 @@
 
             _saveTtsPrefs() {
                 localStorage.setItem('picoclaw_tts', JSON.stringify({
+                    engine: this.ttsEngine,
                     voice:  this.ttsVoiceName,
                     lang:   this.ttsLang,
                     rate:   parseFloat(this.el.ttsRate.value),
                     volume: parseFloat(this.el.ttsVolume.value),
                     pitch:  parseFloat(this.el.ttsPitch.value),
+                    edgeVoice: this.el.edgeTtsVoice.value,
+                    edgeRate: parseInt(this.el.edgeTtsRate.value),
+                    elevenlabsVoice: this.el.elevenlabsTtsVoice.value
                 }));
+            }
+
+            _updateTtsEngineOptions() {
+                // Show/hide options based on selected engine
+                const isBrowser = this.ttsEngine === 'browser';
+                const isEdge = this.ttsEngine === 'edge-tts';
+                const isElevenlabs = this.ttsEngine === 'elevenlabs';
+
+                console.log('Switching TTS engine to:', this.ttsEngine);
+                this.el.ttsEngineBrowserOptions.style.display = isBrowser ? 'block' : 'none';
+                this.el.ttsEngineEdgeOptions.style.display = isEdge ? 'block' : 'none';
+                this.el.ttsEngineElevenlabsOptions.style.display = isElevenlabs ? 'block' : 'none';
+                
+                // If switching to browser mode, ensure voices are loaded
+                if (isBrowser && (!this._allVoices || this._allVoices.length === 0)) {
+                    console.log('Browser mode selected but no voices loaded, retrying...');
+                    const voices = speechSynthesis.getVoices();
+                    if (voices.length > 0) {
+                        this._allVoices = voices;
+                        this._fillVoicesByLang();
+                    }
+                }
             }
 
             _fillVoicesByLang() {
                 // Filter by base language prefix (e.g. 'en' matches en-US, en-GB, en-AU...)
                 const voices = (this._allVoices || []).filter(v => v.lang.split('-')[0] === this.ttsLang);
-                if (!voices.length) return;
+                console.log(`Filling voices for language '${this.ttsLang}':`, voices.length, 'voices found');
+                if (!voices.length) {
+                    console.warn(`No voices found for language '${this.ttsLang}'`);
+                    return;
+                }
                 this.el.ttsVoiceSelect.innerHTML = voices.map(v =>
                     `<option value="${v.name}" ${v.name === this.ttsVoiceName ? 'selected' : ''}>${v.name} (${v.lang})</option>`
                 ).join('');
@@ -1287,10 +2326,11 @@
                 if (!voices.find(v => v.name === this.ttsVoiceName)) {
                     this.ttsVoiceName = voices[0].name;
                     this.el.ttsVoiceSelect.value = this.ttsVoiceName;
+                    console.log('Selected default voice:', this.ttsVoiceName);
                 }
             }
 
-            // ── Voice: audio level visualisation ──────────────────────────────
+            // -- Voice: audio level visualisation ------------------------------
             _startLevelMeter(stream) {
                 try {
                     this._audioCtx = new AudioContext();
@@ -1304,8 +2344,8 @@
                     const tick = () => {
                         analyser.getByteFrequencyData(buf);
                         const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
-                        const pct = Math.min(100, avg * 2.2);           // 0–100
-                        const opacity = 0.06 + (pct / 100) * 0.55;     // 0.06–0.61
+                        const pct = Math.min(100, avg * 2.2);           // 0&#x2013;100
+                        const opacity = 0.06 + (pct / 100) * 0.55;     // 0.06&#x2013;0.61
                         input.style.setProperty('--audio-level', opacity.toFixed(3));
                         input.style.setProperty('--audio-pct', pct.toFixed(1) + '%');
                         this._levelRaf = requestAnimationFrame(tick);
@@ -1324,7 +2364,7 @@
                 input.style.removeProperty('--audio-pct');
             }
 
-            // ── Voice: microphone recording ────────────────────────────────────
+            // -- Voice: microphone recording ------------------------------------
             async toggleRecording() {
                 if (this.mediaRecorder?.state === 'recording') {
                     // Stop both MediaRecorder and live SpeechRecognition
@@ -1357,7 +2397,7 @@
                     }
 
                     // --- Full audio capture for accurate Whisper final transcript ---
-                    // Prefer ogg/opus — whisper's ffmpeg handles it more reliably than webm
+                    // Prefer ogg/opus &#x2013; whisper's ffmpeg handles it more reliably than webm
                     const mimeType = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
                         ? 'audio/ogg;codecs=opus'
                         : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -1375,7 +2415,7 @@
                         this.el.micBtn.classList.add('processing');
                         this.el.micBtn.disabled = true;
                         this.el.messageInput.classList.add('transcribing');
-                        if (!interimText) this.el.messageInput.placeholder = 'Transcribing…';
+                        if (!interimText) this.el.messageInput.placeholder = 'Transcribing&#x2026;';
                         try {
                             const blob = new Blob(this.audioChunks, { type: mimeType });
                             const ext  = mimeType.includes('ogg') ? 'ogg' : 'webm';
@@ -1400,7 +2440,7 @@
                             this.el.micBtn.classList.remove('processing');
                             this.el.micBtn.disabled = false;
                             this.el.messageInput.classList.remove('transcribing');
-                            this.el.messageInput.placeholder = 'Type a message…';
+                            this.el.messageInput.placeholder = 'Type a message&#x2026;';
                         }
                     };
                     this.mediaRecorder.start(100); // 100ms timeslice = proper chunked headers
@@ -1418,21 +2458,21 @@
 
         function applyTheme() {
             const now    = new Date();
-            const month  = now.getMonth() + 1; // 1–12
+            const month  = now.getMonth() + 1; // 1&#x2013;12
             const hour   = now.getHours();
 
             let season, seasonEmoji;
-            if      (month >= 3 && month <= 5)  { season = 'spring'; seasonEmoji = '\uD83C\uDF38'; } // 🌸
-            else if (month >= 6 && month <= 8)  { season = 'summer'; seasonEmoji = '\uD83C\uDF0A'; } // 🌊
-            else if (month >= 9 && month <= 11) { season = 'autumn'; seasonEmoji = '\uD83C\uDF42'; } // 🍂
-            else                                { season = 'winter'; seasonEmoji = '\u2744\uFE0F';  } // ❄️
+            if      (month >= 3 && month <= 5)  { season = 'spring'; seasonEmoji = '\uD83C\uDF38'; } // ??
+            else if (month >= 6 && month <= 8)  { season = 'summer'; seasonEmoji = '\uD83C\uDF0A'; } // ??
+            else if (month >= 9 && month <= 11) { season = 'autumn'; seasonEmoji = '\uD83C\uDF42'; } // ??
+            else                                { season = 'winter'; seasonEmoji = '\u2744\uFE0F';  } // ??
 
             let timeofday, timeEmoji;
-            if      (hour <  6)  { timeofday = 'night';     timeEmoji = '\uD83C\uDF03'; } // 🌃
-            else if (hour <  9)  { timeofday = 'dawn';      timeEmoji = '\uD83C\uDF05'; } // 🌅
-            else if (hour < 17)  { timeofday = 'afternoon'; timeEmoji = '\u2600\uFE0F'; } // ☀️
-            else if (hour < 20)  { timeofday = 'dusk';      timeEmoji = '\uD83C\uDF07'; } // 🌇
-            else                 { timeofday = 'evening';   timeEmoji = '\uD83C\uDF03'; } // 🌃
+            if      (hour <  6)  { timeofday = 'night';     timeEmoji = '\uD83C\uDF03'; } // ??
+            else if (hour <  9)  { timeofday = 'dawn';      timeEmoji = '\uD83C\uDF05'; } // ??
+            else if (hour < 17)  { timeofday = 'afternoon'; timeEmoji = '\u2600\uFE0F'; } // ??
+            else if (hour < 20)  { timeofday = 'dusk';      timeEmoji = '\uD83C\uDF07'; } // ??
+            else                 { timeofday = 'evening';   timeEmoji = '\uD83C\uDF03'; } // ??
 
             const mins    = String(now.getMinutes()).padStart(2, '0');
             const hh      = String(hour).padStart(2, '0');

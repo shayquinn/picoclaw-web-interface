@@ -1,0 +1,60 @@
+{
+  "name": "picoclaw-web-interface",
+  "version": "1.0.0",
+  "description": "Web interface for PicoClaw AI agent",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "node api-server.js",
+    "electron": "electron .",
+    "dist": "electron-builder",
+    "dist:win": "electron-builder --win",
+    "dist:mac": "electron-builder --mac",
+    "dist:linux": "electron-builder --linux"
+  },
+  "keywords": [
+    "picoclaw",
+    "ai",
+    "agent"
+  ],
+  "author": "PicoClaw contributors",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "electron": "^40.8.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.picoclaw.app",
+    "productName": "PicoClaw",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!node_modules/**/*",
+      "node_modules/express/**/*",
+      "node_modules/cors/**/*"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "assets/icon.icns"
+    },
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "icon": "assets/icon.png"
+    }
+  }
+}

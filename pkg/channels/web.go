@@ -8,7 +8,6 @@ package channels
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -19,13 +18,12 @@ import (
 )
 
 // WebChannel provides an HTTP REST API for the web interface to communicate
-// with PicoClaw. It listens on a configurable host/port and exposes:
+// with PicoClaw. It registers handlers on the shared HTTP server:
 //   - POST /api/chat  — send a message and receive a response
-//   - GET  /health    — liveness check
+//   - GET  /api/health — liveness check
 type WebChannel struct {
 	*BaseChannel
 	config    config.WebConfig
-	server    *http.Server
 	pendingMu sync.Mutex
 	pending   map[string]chan string // chat_id -> response channel
 }
@@ -51,40 +49,35 @@ func NewWebChannel(cfg config.WebConfig, msgBus *bus.MessageBus) (*WebChannel, e
 }
 
 func (c *WebChannel) Start(ctx context.Context) error {
-	mux := http.NewServeMux()
-	mux.HandleFunc("/api/chat", c.handleChat)
-	mux.HandleFunc("/health", c.handleHealth)
-
-	addr := fmt.Sprintf("%s:%d", c.config.Host, c.config.Port)
-	c.server = &http.Server{
-		Addr:         addr,
-		Handler:      mux,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 120 * time.Second,
-	}
-
 	c.SetRunning(true)
-
-	logger.InfoCF("web", "Web channel HTTP server starting", map[string]any{
-		"addr": addr,
+	logger.InfoCF("web", "Web channel started - routes registered on shared HTTP server", map[string]any{
+		"routes": []string{"/api/chat", "/api/health"},
 	})
-
-	go func() {
-		if err := c.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.ErrorCF("web", "Web channel server error", map[string]any{"error": err.Error()})
-			c.SetRunning(false)
-		}
-	}()
-
 	return nil
 }
 
 func (c *WebChannel) Stop(ctx context.Context) error {
 	c.SetRunning(false)
-	if c.server != nil {
-		return c.server.Shutdown(ctx)
-	}
 	return nil
+}
+
+// WebhookPath returns the base path for web channel routes.
+// This implements the WebhookHandler interface so the manager can register us.
+func (c *WebChannel) WebhookPath() string {
+	return "/api/"
+}
+
+// ServeHTTP handles HTTP requests for the web channel.
+// Routes: POST /api/chat, GET /api/health
+func (c *WebChannel) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	switch r.URL.Path {
+	case "/api/chat":
+		c.handleChat(w, r)
+	case "/api/health":
+		c.handleHealth(w, r)
+	default:
+		http.NotFound(w, r)
+	}
 }
 
 // Send is called by the channel manager when the agent has a response for this channel.
@@ -178,4 +171,10 @@ func (c *WebChannel) handleChat(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusGatewayTimeout)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": "Request timed out waiting for agent response"})
 	}
+}
+
+func init() {
+	RegisterFactory("web", func(cfg *config.Config, b *bus.MessageBus) (Channel, error) {
+		return NewWebChannel(cfg.Channels.Web, b)
+	})
 }

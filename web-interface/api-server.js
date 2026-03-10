@@ -62,6 +62,15 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '64kb', type: 'application/json' }));
 
+// Serve static files (CSS, JS, etc.) with proper charset
+app.use(express.static(__dirname, {
+    setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css; charset=UTF-8');
+        }
+    }
+}));
+
 // Check if PicoClaw web channel is running
 async function checkGateway() {
     try {
@@ -121,6 +130,87 @@ app.get('/api/health', (req, res) => {
 
 app.get('/api/capabilities', (req, res) => {
     res.json({ whisper: !!whisperBin });
+});
+
+app.get('/api/config', (req, res) => {
+    const configPath = path.join(os.homedir(), '.picoclaw', 'config.json');
+    try {
+        if (!fs.existsSync(configPath)) {
+            return res.status(404).json({ 
+                error: 'Configuration file not found',
+                path: configPath,
+                suggestion: 'Run: .\\build\\picoclaw.exe onboard'
+            });
+        }
+        const configContent = fs.readFileSync(configPath, 'utf8');
+        const config = JSON.parse(configContent);
+        
+        // Return unmasked config for editing if requested
+        if (req.query.raw === 'true') {
+            return res.json({ 
+                config,
+                path: configPath,
+                lastModified: fs.statSync(configPath).mtime
+            });
+        }
+        
+        // Mask sensitive fields (API keys)
+        if (config.providers) {
+            for (const provider in config.providers) {
+                if (config.providers[provider].api_key) {
+                    const key = config.providers[provider].api_key;
+                    config.providers[provider].api_key = key ? key.substring(0, 8) + '...' : '';
+                }
+            }
+        }
+        
+        res.json({ 
+            config,
+            path: configPath,
+            lastModified: fs.statSync(configPath).mtime
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            error: 'Failed to read config file',
+            message: error.message
+        });
+    }
+});
+
+app.post('/api/config', (req, res) => {
+    const configPath = path.join(os.homedir(), '.picoclaw', 'config.json');
+    try {
+        const { config } = req.body;
+        
+        if (!config) {
+            return res.status(400).json({ error: 'Config data is required' });
+        }
+        
+        // Validate JSON structure
+        if (typeof config !== 'object') {
+            return res.status(400).json({ error: 'Config must be a valid JSON object' });
+        }
+        
+        // Create backup before saving
+        if (fs.existsSync(configPath)) {
+            const backupPath = `${configPath}.backup`;
+            fs.copyFileSync(configPath, backupPath);
+        }
+        
+        // Write new config
+        fs.writeFileSync(configPath, JSON.stringify(config, null, 4), 'utf8');
+        
+        res.json({ 
+            success: true,
+            message: 'Configuration saved successfully',
+            lastModified: fs.statSync(configPath).mtime
+        });
+    } catch (error) {
+        res.status(500).json({ 
+            error: 'Failed to save config file',
+            message: error.message
+        });
+    }
 });
 
 // ── Speech-to-text (Whisper) ──────────────────────────────────────────────────

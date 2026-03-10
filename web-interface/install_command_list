@@ -1,5 +1,12 @@
 # PicoClaw Setup Commands (Windows)
 
+**Note:** This setup includes custom additions not in the original picoclaw repository:
+- `pkg/channels/web.go` - HTTP REST API channel for web interface communication
+- `web-interface/` folder - Web UI and Electron desktop app
+- `build-windows.bat` - Windows build script with workspace embedding
+
+---
+
 ## Prerequisites
 Install Go 1.21+, Node.js 18+, and Git before starting.
   Go:     https://go.dev/dl/
@@ -13,13 +20,16 @@ git clone https://github.com/sipeed/picoclaw.git
 cd picoclaw
 
 ## 2. Build the binary
-go build -o build\picoclaw.exe .\cmd\picoclaw\
-  (or double-click build-windows.bat)
+.\build-windows.bat
+  (or: go build -o build\picoclaw.exe .\cmd\picoclaw\)
 
 ## 3. Run first-time onboarding
 .\build\picoclaw.exe onboard
   -> Creates config at %USERPROFILE%\.picoclaw\config.json
-  -> Edit that file to add your API key
+  -> Edit that file to:
+     1. Add your API key (required)
+     2. Enable web channel: set channels.web.enabled = true
+     3. Set channels.web.port = 18790 (default, matches api-server)
 
 ## 4. Start the gateway
 .\build\picoclaw.exe gateway
