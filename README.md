@@ -104,6 +104,42 @@
   </tr>
 </table>
 
+### 🌐 Web Interface & Desktop App
+
+PicoClaw features a powerful browser-based chat interface and configuration editor:
+
+![Demo](Screenshot.png)
+
+**🖥️ Web Interface** (Port 3000):
+- **💬 Chat Interface** — Clean, responsive UI for conversing with your AI agent
+- **🎨 Multi-Chat Management** — Sidebar with session history, create/switch between chats
+- **⚙️ Configuration Editor** — Visual JSON editor for all PicoClaw settings (models, channels, voice, etc.)
+- **🎤 Voice Input** — Microphone button with Whisper/STT support
+- **🔊 Text-to-Speech** — Multiple TTS engines (Browser built-in, Edge-TTS, ElevenLabs)
+- **🎭 Theme System** — Automatic theme with seasonal emojis
+- **🖱️ Electron Ready** — Can run as standalone desktop app (no terminal required)
+
+**🚀 Config Launcher** (Port 18800):
+- **📝 Visual Config Editor** — Sidebar-based settings UI with forms
+- **🤖 Model Management** — Card grid showing availability, add/edit/delete models
+- **📡 Channel Setup** — Forms for 12+ channel types (Telegram, Discord, Slack, etc.)
+- **🔐 OAuth Providers** — Login to OpenAI, Anthropic, Google Antigravity
+
+```bash
+# Start web interface
+cd web-interface
+npm install
+node api-server.js
+# Open http://localhost:3000
+
+# Or run as Electron desktop app
+npm start
+
+# Start config launcher
+./build/picoclaw-launcher
+# Open http://localhost:18800
+```
+
 ### 📱 Run on old Android Phones
 
 Give your decade-old phone a second life! Turn it into a smart AI Assistant with PicoClaw. Quick Start:
