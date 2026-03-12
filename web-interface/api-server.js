@@ -10,7 +10,7 @@ const crypto  = require('crypto');
 const { spawnSync, spawn } = require('child_process');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const GATEWAY_WEB_CHANNEL_URL = process.env.PICOCLAW_WEB_CHANNEL_URL || 'http://localhost:18790';
 
 // ── Whisper STT detection ─────────────────────────────────────────────────────

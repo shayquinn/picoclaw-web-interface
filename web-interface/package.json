@@ -34,27 +34,40 @@
     },
     "files": [
       "**/*",
-      "!node_modules/**/*",
-      "node_modules/express/**/*",
-      "node_modules/cors/**/*"
+      "!**/*.md",
+      "!install_command_list",
+      "!dist/**/*"
     ],
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "assets/icon.ico"
+      "icon": "assets/icon.ico",
+      "extraResources": [
+        { "from": "../build/picoclaw-windows-amd64.exe", "to": "bin/picoclaw.exe" }
+      ],
+      "nsis": {
+        "oneClick": false,
+        "allowToChangeInstallationDirectory": true
+      }
     },
     "mac": {
       "target": [
         "dmg"
       ],
-      "icon": "assets/icon.icns"
+      "icon": "assets/icon.icns",
+      "extraResources": [
+        { "from": "../build/picoclaw-darwin-arm64", "to": "bin/picoclaw" }
+      ]
     },
     "linux": {
       "target": [
         "AppImage"
       ],
-      "icon": "assets/icon.png"
+      "icon": "assets/icon.png",
+      "extraResources": [
+        { "from": "../build/picoclaw-linux-amd64", "to": "bin/picoclaw" }
+      ]
     }
   }
 }
