@@ -65,8 +65,10 @@ function findBinary(cfg) {
     const candidates = [
         // Packed app: binary bundled into resources/bin/
         path.join(process.resourcesPath || '', 'bin', name),
-        // Dev checkout: one level up in build/
+        // Dev checkout: Makefile output (plain name via symlink on Unix)
         path.join(__dirname, '..', 'build', name),
+        // Dev checkout: Makefile output (platform-named, Windows has no symlink)
+        path.join(__dirname, '..', 'build', isWin ? 'picoclaw-windows-amd64.exe' : `picoclaw-${process.platform}-${process.arch === 'x64' ? 'amd64' : process.arch}`),
         path.join(__dirname, '..', name),
     ];
     return candidates.find(p => fs.existsSync(p)) || null;
@@ -234,9 +236,9 @@ function createTray() {
 app.whenReady().then(async () => {
     // Configure spellchecker before any window is created so the dictionary
     // is loaded and suggestions are available on first use.
-    const { session: defaultSession } = require('electron');
-    defaultSession.defaultSession.setSpellCheckerEnabled(true);
-    defaultSession.defaultSession.setSpellCheckerLanguages(['en-US']);
+    const { session } = require('electron');
+    session.defaultSession.setSpellCheckerEnabled(true);
+    session.defaultSession.setSpellCheckerLanguages(['en-US']);
 
     startGateway();
     createTray();
